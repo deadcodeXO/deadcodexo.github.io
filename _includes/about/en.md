@@ -5,8 +5,7 @@ Hi there 👋, I'm Dead Code (👻 DEADCODEXO).
 - 🌱 I’m currently learning many things to figure out what I really want to do.
 - ✨ I do things wholeheartedly.
 - 📫 Fun fact: 
-  - 🔭 I used to do a lot of [Competitive Programming](https://github.com/deadcodexo).
-  - 👻 I moderate communities on twitch/discord.
+  - 👻 I moderate communities on twitch and discord.
   - ⚡ I use Arch btw.
   - 💎 I love hyprland.
 

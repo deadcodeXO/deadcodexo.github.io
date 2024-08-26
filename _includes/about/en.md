@@ -5,13 +5,13 @@ Hi there 👋, I'm Dead Code (👻 DEADCODEXO).
 - 🌱 I’m currently learning many things to figure out what I really want to do.
 - ✨ I do things wholeheartedly.
 - 📫 Fun fact: 
-  - 🔭 I used to do a lot of [Competitive Programming](http://codeforces.com/profile/_LNHTD_).
+  - 🔭 I used to do a lot of [Competitive Programming](https://github.com/deadcodexo).
   - 👻 I obsess with self-improvement.
   - ⚡ I use Arch btw.
   - 💎 I love hyprland.
 
 # ABOUT THIS WEBSITE
-This is a heavily-customized [fork](https://github.com/HynDuf/hynduf.github.io) of the incredible [Hux Blog - Jekyll Theme](https://github.com/Huxpro/huxpro.github.io). Yup, I modified it.
+This is a heavily-customized [fork](https://github.com/HynDuf/hynduf.github.io) of the incredible [Hux Blog - Jekyll Theme](https://github.com/Huxpro/huxpro.github.io). Yup, I modified it. ;)
 
 # CONTACT
 If you want to reach me out then feel free to DM me on any social media.

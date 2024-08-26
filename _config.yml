@@ -1,12 +1,12 @@
 # Site settings
 title: "👻 \  DEADCODEXO \  👋"
-SEOTitle: DeadCodeXO's Blog
+SEOTitle: "DeadCodeXO's Blog"
 header-img: img/hollow-knight.png
 email: deadcodexo@gmail.com
 description: "dowhatnow?"
 keyword: "ayocaine, deadcodexo, blog, arch linux, github"
-url: "https://deadcodexo.github.io" # your host, for absolute URL
-baseurl: "" # for example, '/blog' if your blog hosted on 'host/blog'
+url: "https://deadcodexo.github.io"
+baseurl: ""
 
 # Publish posts or collection documents with a future date.
 future: true
@@ -19,36 +19,26 @@ facebook_username: deadcodexo
 linkedin_username: deadcodexo
 
 # Build settings
-# from 2016, 'pygments' is unsupported on GitHub Pages. Use 'rouge' for highlighting instead.
 highlighter: rouge
 permalink: pretty
 paginate: 10
-exclude:
-  [
-    "less",
-    "node_modules",
-    "Gruntfile.js",
-    "package.json",
-    "README.md",
-    "README.zh.md",
-  ]
-anchorjs: true # if you want to customize anchor. check out line:181 of `post.html`
-# If you have timezone issue (e.g. #68) in China, uncomment to use this:
-#timezone: CN
+exclude: [
+  "less",
+  "node_modules",
+  "Gruntfile.js",
+  "package.json",
+  "README.md",
+  "README.zh.md"
+]
+anchorjs: true
 
 # Gems
-# from PR#40, to support local preview for Jekyll 3.0
-# make sure you have this gem installed
-# `$ gem install jekyll-paginate`
 plugins: [jekyll-paginate]
 
 # Markdown settings
-# replace redcarpet to kramdown,
-# although redcarpet can auto highlight code, the lack of header-id make the catalog impossible, so I switch to kramdown
-# document: http://jekyllrb.com/docs/configuration/#kramdown
 markdown: kramdown
 kramdown:
-  input: GFM # use Github Flavored Markdown !important
+  input: GFM
   syntax_highlighter_opts:
     span:
       line_numbers: false
@@ -67,17 +57,17 @@ netease_comment: false
 # ba_track_id: [your track id]
 
 # Google Analytics
-# ga_track_id: "UA-49627206-1" # Format: UA-xxxxxx-xx
+# ga_track_id: "UA-49627206-1"
 # ga_domain: huangxuan.me
 
 # Sidebar settings
-sidebar: true # whether or not using Sidebar.
-sidebar-about-description: "just a below average ghost, <br/> trapped inside a PC, <br/> who streams on <a href="https://twitch.tv/deadcodexo">twitch.tv</a>"
-sidebar-avatar: https://i.imgur.com/zGXzAQt.png # use absolute URL, seeing it's used in both `/` and `/about/`
+sidebar: true
+sidebar-about-description: "just a below average ghost, <br/> trapped inside a PC, <br/> who streams on <a href=\"https://twitch.tv/deadcodexo\">twitch.tv</a>"
+sidebar-avatar: https://i.imgur.com/zGXzAQt.png
 
 # Featured Tags
-featured-tags: true # whether or not using Feature-Tags
-featured-condition-size: 0 # A tag will be featured if the size of it is more than this condition value
+featured-tags: true
+featured-condition-size: 0
 
 # Progressive Web Apps
 chrome-tab-theme-color: "#000000"
@@ -88,6 +78,6 @@ page-mathjax: false
 
 # Friends
 # friends:
-#  [
-#    { title: "Trí Phan", href: "https://triphan2k3.github.io/" },
-#  ]
+#   [
+#     { title: "Trí Phan", href: "https://triphan2k3.github.io/" },
+#   ]

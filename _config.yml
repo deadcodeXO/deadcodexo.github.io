@@ -87,7 +87,7 @@ service-worker: true
 page-mathjax: false
 
 # Friends
-friends:
-  [
-    { title: "Trí Phan", href: "https://triphan2k3.github.io/" },
-  ]
+# friends:
+#  [
+#    { title: "Trí Phan", href: "https://triphan2k3.github.io/" },
+#  ]

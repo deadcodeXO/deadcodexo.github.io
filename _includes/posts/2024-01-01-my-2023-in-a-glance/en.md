@@ -6,7 +6,7 @@ This is the first time I've decided to write a year review. Perhaps the main rea
 Many things have happened in the last year. I learned a lot about what works and what doesn't. Some highlights include:
 
 - **Having a full-time internship at Whydah in the summer**. Actually, I didn't expect this. Thanks to many great people, I successfully seized the opportunity. Who could think that suddenly I'm in Ho Chi Minh City, living a weird different life for 3 months? To summarize, I had a great time there meeting and working with incredible people. I had the chance to join a running club (shout out to RRC), participate in Cu Chi City Trail, run for 10 km, and then immediately ended up in the hospital, staying for the next 7 days because of bacterial pneumonia (thought I was dying btw, that period was worse than these words can describe) 🫠. I bet nobody could have this kind of experience. Anyway, thanks to everybody at Whydah and those precious memories. Hope we can meet again.
-- **ICPC**: Besides visiting Hue City for the Regional and managing to qualify for the upcoming Super Regional, there's not much to talk about. My team and I didn't give the best performance possible. I even failed hard at the ICPC Hue competition too, but I'm still lucky enough 🌸.
+- **ICPC**: Besides visiting Hue City for the Regional and managing to qualify for the upcoming Super Regional, there's not much to talk about. My team and I didn't give the best performance possible. I even failed hard at the ICPC Hue competition too, but I'm still lucky enough 👻.
 - **Others**: In the remaining part of the year, it's just me dealing with some boring university deadlines
 
 ## Cool things I found in 2023

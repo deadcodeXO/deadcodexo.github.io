@@ -1,14 +1,14 @@
 {
-    "name": "hux-blog",
-    "title": "Hux Blog",
-    "author": "Hux <huxpro@gmail.com>",
+    "name": "dead-blog",
+    "title": "dead Blog",
+    "author": "deadcodexo <deadcodexo@gmail.com>",
     "version": "1.8.2",
-    "homepage": "http://huxpro.github.io",
+    "homepage": "http://deadcodexo.github.io",
     "repository": {
         "type": "git",
-        "url": "https://github.com/Huxpro/huxpro.github.io"
+        "url": "https://github.com/deadcodexo/deadcodexo.github.io"
     },
-    "bugs": "https://github.com/Huxpro/huxpro.github.io/issues",
+    "bugs": "https://github.com/deadcodexo/deadcodexo.github.io/issues",
     "devDependencies": {
         "grunt": "^1.6.1",
         "grunt-banner": "~0.2.3",

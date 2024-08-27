@@ -81,3 +81,6 @@ page-mathjax: false
 #   [
 #     { title: "Dead Code", href: "https://deadcodexo.github.io/" },
 #   ]
+collections:
+  projects:
+    output: true

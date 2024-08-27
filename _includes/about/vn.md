@@ -1,7 +1,0 @@
-# ABOUT ME
-um hi
-
-# ABOUT THIS WEBSITE
-
-# CONTACT
-

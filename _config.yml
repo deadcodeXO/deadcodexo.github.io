@@ -76,11 +76,12 @@ service-worker: true
 # MathJax rendering for layout:page (e.g. post preview)
 page-mathjax: false
 
-# Friends
-# friends:
-#   [
-#     { title: "Dead Code", href: "https://deadcodexo.github.io/" },
-#   ]
 collections:
   projects:
     output: true
+# Friends
+friends:
+  [
+    { title: "Dead Code", href: "https://deadcodexo.github.io/" },
+  ]
+

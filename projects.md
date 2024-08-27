@@ -1,7 +1,7 @@
 ---
 layout: page
 title: "Projects"
-description: "A showcase of my projects"
+description: "「 A list of my projects 」"
 header-img: "img/post-bg-about.jpg"
 ---
 

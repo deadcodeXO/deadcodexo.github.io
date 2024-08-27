@@ -1,7 +1,8 @@
 ---
 layout: post
 title: "Project 1"
-image: "/assets/images/project1.jpg"
+description: "Description of Project 1"
+image: "/img/post-bg-about.jpg"
 ---
 
-This is a description of Project 1.
+Detailed information about Project 1 goes here.

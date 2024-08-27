@@ -82,6 +82,6 @@ collections:
 # Friends
 friends:
   [
-    { title: "Dead Code", href: "https://deadcodexo.github.io/" },
+    { title: "John Doe", href: "https://deadcodexo.github.io/" },
   ]
 

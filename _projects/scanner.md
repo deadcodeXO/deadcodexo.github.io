@@ -28,7 +28,7 @@ The goal of this project is to create a Python tool that can scan one or multipl
 
 ## Source Code
 
-Feel free to expand on this content with specific details about your example project.
+Feel free to modify this however you want.
 
 {% highlight python %}
 import socket

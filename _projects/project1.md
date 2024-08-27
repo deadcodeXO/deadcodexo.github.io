@@ -185,4 +185,4 @@ Keep your message brief (1-3 sentences) and engaging to encourage responses.
 client.login(process.env.DISCORD_TOKEN);
 {% endhighlight %}
 
-Don't forget to create a .env with variables for your discord and gemini api tokens.
+Don't forget to create a .env with variables (GOOGLE_API_KEY and DISCORD_TOKEN) for your discord and gemini api tokens.

@@ -3,4 +3,6 @@
 
 
 
-I think that's it. Please feel free to create any issues or contribute to the site. Special thanks to [Hux Blog](https://github.com/Huxpro/huxpro.github.io) for the incredible Jekyll theme, [Catppuccin](https://github.com/catppuccin/catppuccin) for the beautiful color palette, and a big shoutout to myself for having time to waste 😋.
+I probably broke 500 things editing this for my own use. if you fork it, it will probably be broken, but go nuts with it!
+
+orig. theme/layout/most of the work is by https://github.com/HynDuf/hynduf.github.io

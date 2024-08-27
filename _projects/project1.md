@@ -28,6 +28,7 @@ This project is a Discord bot developed in Node.js that aims to create a more hu
 ## Source Code
 
 ```npm install discord.js dotenv systeminformation @google/generative-ai```
+
 Don't forget to create a .env with variables (GOOGLE_API_KEY and DISCORD_TOKEN) for your discord and gemini api tokens.
 {% highlight javascript %}
 const { Client, GatewayIntentBits } = require('discord.js');

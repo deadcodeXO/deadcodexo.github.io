@@ -16,7 +16,7 @@ I'm excited to share two new projects I've been working on that explore differen
 
 ## Node.js Discord Bot
 
-https://deadcodexo.github.io/projects/nodebot/
+[https://deadcodexo.github.io/projects/nodebot/](https://deadcodexo.github.io/projects/nodebot/)
 
 This Discord bot is designed to enhance server functionality with custom commands. Key features include:
 
@@ -29,7 +29,7 @@ It's an excellent starting point for those interested in creating their own Disc
 
 ## Python Port Scanner
 
-https://deadcodexo.github.io/projects/scanner/
+[https://deadcodexo.github.io/projects/scanner/](https://deadcodexo.github.io/projects/scanner/)
 
 The port scanner is a powerful tool for network analysis, offering:
 

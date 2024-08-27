@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "New Projects"
+title: "Two Projects Added"
 subtitle: "Exploring Network Programming with Discord Bot and Port Scanner"
 date: 2024-08-27
 author: "DEADCODEXO"

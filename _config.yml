@@ -1,5 +1,5 @@
 # Site settings
-title: "👻 \  DEADCODEXO \  👋"
+title: "👻 \  DEADCODEXO \   "
 SEOTitle: "DeadCodeXO's Blog"
 header-img: img/post-bg-about.jpg
 email: deadcodexo@gmail.com
@@ -82,6 +82,7 @@ collections:
 # Friends
 friends:
   [
-    { title: "John Doe", href: "https://deadcodexo.github.io/" },
+    { title: "AutoGPT", href: "https://github.com/Significant-Gravitas/AutoGPT" },
+    { title: "ollama", href: "https://github.com/ollama/ollama" }
   ]
 

@@ -58,10 +58,10 @@ We welcome contributions and suggestions for improving the bot's functionality. 
 Here's the full source code for the Discord Article Management Bot:
 
 your_project_folder/  
-   ├── bot.py  
-   ├── config.ini  
-   └── commands/  
-     └── articles.py  
+&nbsp;   ├── bot.py  
+&nbsp;   ├── config.ini  
+&nbsp;   └── commands/  
+&nbsp; &nbsp;     └── articles.py  
 
 config.ini:
 ```json

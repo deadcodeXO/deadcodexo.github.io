@@ -4,7 +4,7 @@ SEOTitle: "DeadCodeXO's Blog"
 header-img: img/post-bg-about.jpg
 email: deadcodexo@gmail.com
 description: "dowhatnow?"
-keyword: "ayocaine, deadcodexo, blog, arch linux, github"
+keyword: "deadcodexo, blog, arch linux, github, gaming, hacking, coding, programming"
 url: "https://deadcodexo.github.io"
 baseurl: ""
 
@@ -62,7 +62,7 @@ netease_comment: false
 
 # Sidebar settings
 sidebar: true
-sidebar-about-description: "just a below average ghost, <br/> trapped inside a PC, <br/> who streams on <a href=\"https://twitch.tv/deadcodexo\">twitch.tv</a>"
+sidebar-about-description: "just a below average ghost, <br/>trapped inside a PC, <br/>who streams on <a href=\"https://twitch.tv/deadcodexo\">twitch.tv</a>"
 sidebar-avatar: https://i.imgur.com/zGXzAQt.png
 
 # Featured Tags

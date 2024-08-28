@@ -45,8 +45,6 @@ This project is a Discord bot designed to help server members create, manage, an
 
 ## Source Code
 
-[GitHub Repository](https://github.com/yourusername/discord-article-bot)
-
 This Discord bot project aims to provide a seamless way for community members to share and manage long-form content within Discord servers. It's particularly useful for communities that frequently share tutorials, guides, or any other type of multi-page content.
 
 The bot uses TinyDB as a lightweight, file-based database, making it easy to set up and manage without the need for external database servers. The asynchronous design ensures efficient handling of Discord events and user interactions.

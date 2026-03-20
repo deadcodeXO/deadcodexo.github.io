@@ -15,7 +15,7 @@ const { frontmatter } = Astro.props;
   <Header />
   <Breadcrumb />
   <main id="main-content" class="app-layout">
-    <!-- Hero con aurora interactiva -->
+    <!-- Hero with interactive aurora -->
     <div class="about-hero" data-about-hero>
       <div class="aurora-orb aurora-orb-1"></div>
       <div class="aurora-orb aurora-orb-2"></div>
@@ -25,17 +25,17 @@ const { frontmatter } = Astro.props;
         <div class="avatar-ring">
           <div class="avatar-glow"></div>
           <div class="avatar-inner">
-            <span class="avatar-emoji">👨‍💻</span>
+            <img src="/images/avatar.png" alt="deadcodexo avatar" class="avatar-image" />
           </div>
         </div>
         <h1 class="hero-title">
-          <span class="greeting">¡Hola! Soy</span>
+          <span class="greeting">Hi, I am</span>
           <span class="name-glow">{SITE.author}</span>
         </h1>
         <div class="hero-badges">
-          <span class="badge" data-badge>🚀 Developer</span>
-          <span class="badge" data-badge>📚 Estudiante</span>
-          <span class="badge" data-badge>🎮 Gamer</span>
+          <span class="badge" data-badge>Developer</span>
+          <span class="badge" data-badge>Drone Pilot</span>
+          <span class="badge" data-badge>Gamer</span>
         </div>
       </div>
     </div>
@@ -287,6 +287,7 @@ const { frontmatter } = Astro.props;
     width: 100%;
     height: 100%;
     border-radius: 50%;
+    overflow: hidden;
     background: var(--color-background);
     display: flex;
     align-items: center;
@@ -294,9 +295,11 @@ const { frontmatter } = Astro.props;
     animation: ring-spin 6s linear infinite reverse;
   }
 
-  .avatar-emoji {
-    font-size: 2.8rem;
-    line-height: 1;
+  .avatar-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
   }
 
   .hero-title {

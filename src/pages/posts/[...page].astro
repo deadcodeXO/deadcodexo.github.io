@@ -35,14 +35,14 @@ const totalPosts = page.total;
           <span class="glow-text">Posts</span>
         </h1>
         <p class="mt-3 max-w-lg text-foreground/70 italic">
-          Todos los artículos que he publicado.
+          All published articles.
         </p>
         <div class="mt-4 flex flex-wrap items-center gap-2">
           <span class="hero-badge">{totalPosts} posts</span>
           {
             page.lastPage > 1 && (
               <span class="hero-badge">
-                Página {page.currentPage}/{page.lastPage}
+                Page {page.currentPage}/{page.lastPage}
               </span>
             )
           }
@@ -77,9 +77,9 @@ const totalPosts = page.total;
                 <line x1="9" y1="15" x2="15" y2="15"></line>
               </svg>
             </div>
-            <h3 class="empty-title">Aún no hay posts</h3>
+            <h3 class="empty-title">No posts yet</h3>
             <p class="empty-desc">
-              Vuelve más tarde para leer nuestros próximos artículos.
+              Check back later for upcoming articles.
             </p>
           </div>
         ) : (
@@ -141,7 +141,7 @@ const totalPosts = page.total;
       if (import.meta.env.DEV) {
         container.innerHTML = `
           <div class="bg-muted/75 rounded p-4 text-sm mb-4 border border-border">
-            <p><strong>Dev Mode:</strong> La búsqueda intentará usar el índice construido más reciente. Si no ves resultados, ejecuta <code>pnpm run build</code> primero.</p>
+            <p><strong>Dev Mode:</strong> Search uses the latest built index. If you do not see results, run <code>pnpm run build</code> first.</p>
           </div>
         `;
         // Removed the early return to allow pagefind to attempt loading the local index
@@ -151,6 +151,21 @@ const totalPosts = page.total;
         element: "#posts-pagefind",
         showImages: false,
         showSubResults: true,
+        translations: {
+          placeholder: "Search",
+          clear_search: "Clear",
+          load_more: "Load more results",
+          search_label: "Search this site",
+          filters_label: "Filters",
+          zero_results: "No results for [SEARCH_TERM]",
+          many_results: "[COUNT] results for [SEARCH_TERM]",
+          one_result: "[COUNT] result for [SEARCH_TERM]",
+          alt_search:
+            "No results for [SEARCH_TERM]. Showing results for [DIFFERENT_TERM] instead",
+          search_suggestion:
+            "No results for [SEARCH_TERM]. Try one of the following searches:",
+          searching: "Searching for [SEARCH_TERM]...",
+        },
       });
 
       // Toggle default posts grid visibility when typing
@@ -397,3 +412,4 @@ const totalPosts = page.total;
     margin: 0 auto;
   }
 </style>
+

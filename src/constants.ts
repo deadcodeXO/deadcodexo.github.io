@@ -2,7 +2,8 @@ import type { Props } from "astro";
 import IconMail from "@/assets/icons/IconMail.svg";
 import IconGitHub from "@/assets/icons/IconGitHub.svg";
 import IconBrandX from "@/assets/icons/IconBrandX.svg";
-import IconLinkedin from "@/assets/icons/IconLinkedin.svg";
+import IconFluxer from "@/assets/icons/IconFluxer.svg";
+import IconDiscord from "@/assets/icons/IconDiscord.svg";
 import IconWhatsapp from "@/assets/icons/IconWhatsapp.svg";
 import IconFacebook from "@/assets/icons/IconFacebook.svg";
 import IconTelegram from "@/assets/icons/IconTelegram.svg";
@@ -19,26 +20,32 @@ interface Social {
 export const SOCIALS: Social[] = [
   {
     name: "GitHub",
-    href: "https://github.com/0xdres/",
-    linkTitle: `${SITE.title} en GitHub`,
+    href: "https://github.com/deadcodexo",
+    linkTitle: `${SITE.title} on GitHub`,
     icon: IconGitHub,
   },
   {
     name: "X",
-    href: "https://x.com/avdyen",
-    linkTitle: `${SITE.title} en X`,
+    href: "https://x.com/deadcodexo",
+    linkTitle: `${SITE.title} on X`,
     icon: IconBrandX,
   },
   {
-    name: "LinkedIn",
-    href: "https://www.linkedin.com/in/avdyan/",
-    linkTitle: `${SITE.title} en LinkedIn`,
-    icon: IconLinkedin,
+    name: "Fluxer",
+    href: "https://fluxer.gg/zplgpGgl",
+    linkTitle: `DigitalChaos @ Fluxer`,
+    icon: IconFluxer,
+  },
+  {
+    name: "Discord",
+    href: "https://discord.gg/8nDZWyh4eS",
+    linkTitle: `DigitalChaos @ Discord`,
+    icon: IconDiscord,
   },
   {
     name: "Mail",
-    href: "mailto:andres04u@gmail.com",
-    linkTitle: `Envia un correo a ${SITE.title}`,
+    href: "mailto:deadcodexo@gmail.com",
+    linkTitle: `Send email to ${SITE.title}`,
     icon: IconMail,
   },
 ] as const;
@@ -47,37 +54,37 @@ export const SHARE_LINKS: Social[] = [
   {
     name: "WhatsApp",
     href: "https://wa.me/?text=",
-    linkTitle: `Envia este post por WhatsApp`,
+    linkTitle: `Share this post on WhatsApp`,
     icon: IconWhatsapp,
   },
   {
     name: "Facebook",
     href: "https://www.facebook.com/sharer.php?u=",
-    linkTitle: `Comparte este post en Facebook`,
+    linkTitle: `Share this post on Facebook`,
     icon: IconFacebook,
   },
   {
     name: "X",
     href: "https://x.com/intent/post?url=",
-    linkTitle: `Comparte este post en X`,
+    linkTitle: `Share this post on X`,
     icon: IconBrandX,
   },
   {
     name: "Telegram",
     href: "https://t.me/share/url?url=",
-    linkTitle: `Comparte este post por Telegram`,
+    linkTitle: `Share this post on Telegram`,
     icon: IconTelegram,
   },
   {
     name: "Pinterest",
     href: "https://pinterest.com/pin/create/button/?url=",
-    linkTitle: `Comparte este post en Pinterest`,
+    linkTitle: `Share this post on Pinterest`,
     icon: IconPinterest,
   },
   {
     name: "Mail",
     href: "mailto:?subject=See%20this%20post&body=",
-    linkTitle: `Envia este post por correo`,
+    linkTitle: `Share this post by email`,
     icon: IconMail,
   },
 ] as const;

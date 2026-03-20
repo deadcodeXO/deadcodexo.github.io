@@ -144,8 +144,9 @@ i {
   margin-top: 1.5rem;
 }
 
-.premium-search .pagefind-ui__result {
+.premium-search .pagefind-ui__results .pagefind-ui__result.pagefind-ui__result {
   padding: 1.25rem;
+  padding-left: 1.55rem;
   border: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
   border-radius: 1rem;
   background: color-mix(in srgb, var(--foreground) 2%, var(--background));
@@ -153,7 +154,7 @@ i {
   margin-bottom: 1rem;
 }
 
-.premium-search .pagefind-ui__result:hover {
+.premium-search .pagefind-ui__results .pagefind-ui__result.pagefind-ui__result:hover {
   border-color: color-mix(in srgb, var(--accent) 30%, transparent);
   background: color-mix(in srgb, var(--accent) 4%, var(--background));
   transform: translateY(-2px);

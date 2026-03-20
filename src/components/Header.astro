@@ -48,8 +48,7 @@ const isActive = (path: string) => {
           href="/"
           class="group relative z-20 flex items-center gap-2 text-xl font-bold tracking-tight sm:text-2xl"
         >
-          <!-- <span class="nav-logo-text">{SITE.title}</span> -->
-          <Logo class="w-37.5 dark:invert" />
+          <Logo class="h-8 w-auto dark:invert" />
         </a>
 
         <!-- Nav area -->
@@ -96,7 +95,7 @@ const isActive = (path: string) => {
               <a
                 href="/search"
                 class:list={["nav-link", { "nav-active": isActive("/search") }]}
-                title="Ir a búsqueda">Search</a
+                title="Go to search">Search</a
               >
             </li>
             {
@@ -126,11 +125,11 @@ const isActive = (path: string) => {
                       "nav-link",
                       { "nav-active": isActive("/galleries") },
                     ]}
-                    title="Galerías"
+                    title="Galleries"
                     aria-label="galleries"
                   >
                     <IconGallery class="hidden sm:inline-block" />
-                    <span class="sm:sr-only">Galerías</span>
+                    <span class="sm:sr-only">Galleries</span>
                   </LinkButton>
                 </li>
               )
@@ -142,13 +141,13 @@ const isActive = (path: string) => {
             </li>
 
             <li class="flex items-center">
-              <button
-                data-search-trigger
-                class="nav-search-btn"
-                title="Buscar (⌘K)"
-                aria-label="Abrir búsqueda"
-                aria-keyshortcuts="Meta+K"
-              >
+                <button
+                  data-search-trigger
+                  class="nav-search-btn"
+                  title="Search (⌘K)"
+                  aria-label="Open search"
+                  aria-keyshortcuts="Meta+K"
+                >
                 <IconSearch class="size-4.5" />
                 <kbd class="nav-kbd">⌘K</kbd>
               </button>
@@ -185,7 +184,7 @@ const isActive = (path: string) => {
 </header>
 
 <style>
-  /* ─── Header Glass & Scroll Physics ─── */
+  /* Header Glass & Scroll Physics */
   #main-header {
     background: transparent;
   }
@@ -200,19 +199,7 @@ const isActive = (path: string) => {
     -webkit-backdrop-filter: blur(16px) saturate(180%);
   }
 
-  .nav-logo-text {
-    background: linear-gradient(
-      135deg,
-      var(--foreground) 0%,
-      var(--foreground) 60%,
-      var(--accent) 100%
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-
-  /* ─── Logo SVG hover effects ─── */
+  /* Logo SVG hover effects */
   :global(.logo-text-left),
   :global(.logo-text-right) {
     transition:
@@ -223,7 +210,7 @@ const isActive = (path: string) => {
     transition:
       transform 0.3s ease,
       filter 0.3s ease;
-    transform-origin: 342px 130px;
+    transform-origin: 508px 130px;
   }
 
   .group:hover :global(.logo-text-left) {
@@ -260,7 +247,7 @@ const isActive = (path: string) => {
     }
   }
 
-  /* ─── Desktop nav links ─── */
+  /* Desktop nav links */
   .nav-link {
     position: relative;
     display: inline-flex;
@@ -315,7 +302,7 @@ const isActive = (path: string) => {
     color: var(--foreground);
   }
 
-  /* ─── Desktop Search Button with ⌘K ─── */
+  /* Desktop Search Button with ⌘K */
   .nav-search-btn {
     display: inline-flex;
     align-items: center;
@@ -359,7 +346,7 @@ const isActive = (path: string) => {
     color: var(--accent);
   }
 
-  /* ─── Animated Hamburger Button ─── */
+  /* Animated Hamburger Button */
   .hamburger-btn {
     position: relative;
     z-index: 20;
@@ -533,3 +520,4 @@ const isActive = (path: string) => {
     setupMobileNav();
   });
 </script>
+

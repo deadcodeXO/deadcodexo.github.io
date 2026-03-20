@@ -4,7 +4,10 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro check && astro build && pagefind --site dist && cp -r dist/pagefind public/",
+    "build": "astro check && astro build && pagefind --site dist && node scripts/copy-pagefind.cjs",
+    "new:post": "node scripts/new-post.cjs",
+    "syncdocs": "node scripts/sync-docs.cjs",
+    "readyprod": "npm run build && npm run syncdocs",
     "preview": "astro preview",
     "sync": "astro sync",
     "astro": "astro",

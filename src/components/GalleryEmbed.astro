@@ -87,7 +87,7 @@ const gridClass = {
 {
   !entry ? (
     <div class="ge-error">
-      ⚠️ Galería <code>{slug}</code> no encontrada. Verifica que exista{" "}
+      Gallery <code>{slug}</code> not found. Make sure{" "}
       <code>src/data/galleries/{slug}/index.md</code>.
     </div>
   ) : (
@@ -112,7 +112,7 @@ const gridClass = {
           <rect x="14" y="14" width="7" height="7" rx="1" />
         </svg>
         <span class="ge-title">{entry.data.title}</span>
-        {remaining > 0 && <span class="ge-count">+{remaining} más</span>}
+        {remaining > 0 && <span class="ge-count">+{remaining} more</span>}
       </div>
 
       {/* Grid de imágenes */}
@@ -120,7 +120,7 @@ const gridClass = {
         <ul
           class:list={["ge-grid", gridClass]}
           role="list"
-          aria-label={`Galería: ${entry.data.title}`}
+          aria-label={`Gallery: ${entry.data.title}`}
         >
           {visibleImages.map((img, idx) => (
             <li>
@@ -128,7 +128,7 @@ const gridClass = {
                 class="ge-item group"
                 data-lb={lbId}
                 data-index={idx}
-                aria-label={`Ver imagen: ${img.alt}`}
+                aria-label={`View image: ${img.alt}`}
                 type="button"
               >
                 <Image
@@ -147,7 +147,7 @@ const gridClass = {
           ))}
         </ul>
       ) : (
-        <p class="ge-empty">Esta galería todavía no tiene imágenes.</p>
+        <p class="ge-empty">This gallery does not have images yet.</p>
       )}
 
       {/* Pie: descripción + enlace a la galería completa */}
@@ -157,7 +157,7 @@ const gridClass = {
         )}
         {showLink && (
           <a href={`/galleries/${slug}`} class="ge-link">
-            Ver galería completa
+            View full gallery
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="14"
@@ -183,13 +183,13 @@ const gridClass = {
 <dialog
   id={lbId}
   class="ge-lightbox"
-  aria-label={`Visor: ${entry?.data.title ?? slug}`}
+  aria-label={`Viewer: ${entry?.data.title ?? slug}`}
   aria-modal="true"
 >
   <button
     class="ge-lb-close"
     data-lb-close={lbId}
-    aria-label="Cerrar"
+    aria-label="Close"
     type="button"
   >
     <svg
@@ -210,7 +210,7 @@ const gridClass = {
   <button
     class="ge-lb-nav ge-lb-prev"
     data-lb-prev={lbId}
-    aria-label="Anterior"
+    aria-label="Previous"
     type="button"
   >
     <svg
@@ -235,7 +235,7 @@ const gridClass = {
   <button
     class="ge-lb-nav ge-lb-next"
     data-lb-next={lbId}
-    aria-label="Siguiente"
+    aria-label="Next"
     type="button"
   >
     <svg

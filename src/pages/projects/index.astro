@@ -1,0 +1,119 @@
+---
+import { getCollection } from "astro:content";
+import Layout from "@/layouts/Layout.astro";
+import Header from "@/components/Header.astro";
+import Footer from "@/components/Footer.astro";
+import Breadcrumb from "@/components/Breadcrumb.astro";
+import Card from "@/components/Card.astro";
+import { SITE } from "@/config";
+import getPostsByTag from "@/utils/getPostsByTag";
+
+const allPosts = await getCollection("blog");
+const projectPosts = getPostsByTag(allPosts, "project");
+---
+
+<Layout title={`Projects | ${SITE.title}`}>
+  <Header />
+  <Breadcrumb />
+  <main id="main-content" class="app-layout pb-12">
+    <section class="projects-hero">
+      <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">
+        <span class="glow-text">Projects</span>
+      </h1>
+      <p class="page-hero-subtitle mt-3 max-w-2xl text-foreground/70">
+        A gallery of build logs and writeups tagged <code>project</code>.
+      </p>
+      <div class="mt-4 flex items-center gap-2">
+        <span class="hero-badge">
+          {projectPosts.length} {projectPosts.length === 1 ? "project" : "projects"}
+        </span>
+      </div>
+    </section>
+
+    {
+      projectPosts.length === 0 ? (
+        <div class="empty-state">
+          <h2 class="text-lg font-semibold">No projects yet</h2>
+          <p class="mt-2 text-sm opacity-70">
+            Add the <code>project</code> tag to a post and it will appear here automatically.
+          </p>
+        </div>
+      ) : (
+        <ul class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 [&>li]:my-0">
+          {projectPosts.map(post => <Card {...post} />)}
+        </ul>
+      )
+    }
+  </main>
+  <Footer />
+</Layout>
+
+<script>
+  document.addEventListener("astro:page-load", () => {
+    // Keep card glow behavior consistent with other card lists.
+    document.querySelectorAll<HTMLElement>(".card-glow").forEach(card => {
+      card.addEventListener("mousemove", (e: MouseEvent) => {
+        const rect = card.getBoundingClientRect();
+        card.style.setProperty("--mouse-x", `${e.clientX - rect.left}px`);
+        card.style.setProperty("--mouse-y", `${e.clientY - rect.top}px`);
+      });
+    });
+  });
+</script>
+
+<style>
+  .projects-hero {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1.5rem;
+    padding: 2.5rem 2rem;
+    margin-bottom: 2rem;
+    background: color-mix(
+      in srgb,
+      var(--color-foreground) 3%,
+      var(--color-background)
+    );
+    border: 1px solid color-mix(in srgb, var(--color-accent) 12%, transparent);
+  }
+
+  @media (min-width: 640px) {
+    .projects-hero {
+      padding: 3rem;
+    }
+  }
+
+  .glow-text {
+    background: linear-gradient(
+      135deg,
+      var(--color-foreground),
+      var(--color-accent)
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(
+      0 0 20px color-mix(in srgb, var(--color-accent) 20%, transparent)
+    );
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.3rem 0.85rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-accent);
+    background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-accent) 15%, transparent);
+    backdrop-filter: blur(8px);
+  }
+
+  .empty-state {
+    border-radius: 1rem;
+    border: 1px solid color-mix(in srgb, var(--color-border) 25%, transparent);
+    background: color-mix(in srgb, var(--color-muted) 15%, transparent);
+    padding: 1rem 1.25rem;
+  }
+</style>

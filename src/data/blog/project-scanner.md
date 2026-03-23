@@ -1,10 +1,11 @@
 ---
-title: "Port Scanner"
-description: "This is a port scanner and banner grabber written in python"
-pubDatetime: 2024-08-27T12:00:00Z
-author: "DEADCODEXO"
-tags: ["project"]
+title: "Project: Port Scanner"
+description: This is a port scanner and banner grabber written in python
+pubDatetime: 2024-08-27T12:00:00.000Z
+author: DEADCODEXO
 draft: false
+tags:
+  - project
 ---
 
 The goal of this project is to create a Python tool that can scan one or multiple IP addresses for open ports within a specified range and retrieve banners from those ports. The tool is designed to be user-friendly, efficient, and capable of handling multiple IP addresses and port ranges.

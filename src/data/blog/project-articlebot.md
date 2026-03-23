@@ -1,10 +1,11 @@
 ---
-title: "Discord Article Management Bot"
-description: "A Python-based Discord bot for creating, editing, and managing articles"
-pubDatetime: 2024-08-28T12:00:00Z
-author: "DEADCODEXO"
-tags: ["project"]
+title: "Project: Discord Article Management Bot"
+description: A Python-based Discord bot for creating, editing, and managing articles
+pubDatetime: 2024-08-28T12:00:00.000Z
+author: DEADCODEXO
 draft: false
+tags:
+  - project
 ---
 
 This project is a Discord bot designed to help server members create, manage, and share multi-page articles directly within Discord channels.

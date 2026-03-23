@@ -18,6 +18,7 @@ const showEditorLink = import.meta.env.DEV;
 const excludedNavPaths = new Set([
   "/about",
   "/posts",
+  "/projects",
   "/tags",
   "/search",
   "/editor",
@@ -121,6 +122,24 @@ const isActive = (path: string) => {
           <ul class="hidden sm:flex sm:flex-row sm:items-center sm:gap-1">
             <li>
               <a
+                href="/about"
+                class:list={["nav-link", { "nav-active": isActive("/about") }]}
+                >About</a
+              >
+            </li>
+            {
+              SITE.showProjects && (
+                <li>
+                  <a
+                    href="/projects"
+                    class:list={["nav-link", { "nav-active": isActive("/projects") }]}
+                    >Projects</a
+                  >
+                </li>
+              )
+            }
+            <li>
+              <a
                 href="/posts"
                 class:list={["nav-link", { "nav-active": isActive("/posts") }]}
                 >Posts</a
@@ -131,13 +150,6 @@ const isActive = (path: string) => {
                 href="/tags"
                 class:list={["nav-link", { "nav-active": isActive("/tags") }]}
                 >Tags</a
-              >
-            </li>
-            <li>
-              <a
-                href="/about"
-                class:list={["nav-link", { "nav-active": isActive("/about") }]}
-                >About</a
               >
             </li>
             {
@@ -151,6 +163,13 @@ const isActive = (path: string) => {
                 </li>
               ))
             }
+            <li class="flex items-center">
+              <a
+                href="/search"
+                class:list={["nav-link", { "nav-active": isActive("/search") }]}
+                title="Go to search">Search</a
+              >
+            </li>
             {
               showEditorLink && (
                 <li>
@@ -162,13 +181,6 @@ const isActive = (path: string) => {
                 </li>
               )
             }
-            <li class="flex items-center">
-              <a
-                href="/search"
-                class:list={["nav-link", { "nav-active": isActive("/search") }]}
-                title="Go to search">Search</a
-              >
-            </li>
             {
               SITE.showArchives && (
                 <li>

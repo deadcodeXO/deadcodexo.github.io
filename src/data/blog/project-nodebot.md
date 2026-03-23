@@ -1,10 +1,11 @@
 ---
-title: "Gemini AI Discord Bot"
-description: "Discord bot in NodeJS"
-pubDatetime: 2024-08-27T12:00:00Z
-author: "DEADCODEXO"
-tags: ["project"]
+title: "Project: Gemini AI Discord Bot"
+description: Discord bot in NodeJS
+pubDatetime: 2024-08-27T12:00:00.000Z
+author: DEADCODEXO
 draft: false
+tags:
+  - project
 ---
 
 This project is a Discord bot developed in Node.js that aims to create a more human-like and interactive presence in Discord servers. 

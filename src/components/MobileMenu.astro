@@ -11,7 +11,12 @@ interface Props {
 
 const { currentPath, navPages = [] } = Astro.props;
 const showEditorLink = import.meta.env.DEV;
-const editIndex = 3 + navPages.length;
+const aboutIndex = 0;
+const projectsIndex = SITE.showProjects ? 1 : 0;
+const postsIndex = SITE.showProjects ? 2 : 1;
+const tagsIndex = postsIndex + 1;
+const navStartIndex = tagsIndex + 1;
+const editIndex = navStartIndex + navPages.length;
 const archivesIndex = editIndex + (showEditorLink ? 1 : 0);
 const galleriesIndex = archivesIndex + (SITE.showArchives ? 1 : 0);
 
@@ -34,9 +39,29 @@ const isActive = (path: string) => {
       <div class="mobile-menu-inner">
         <nav class="mobile-nav-links">
           <a
+            href="/about"
+            class:list={["mobile-nav-link", { active: isActive("/about") }]}
+            style={`--i:${aboutIndex}`}
+          >
+            <span class="mobile-nav-indicator"></span>
+            <span>About</span>
+          </a>
+          {
+            SITE.showProjects && (
+              <a
+                href="/projects"
+                class:list={["mobile-nav-link", { active: isActive("/projects") }]}
+                style={`--i:${projectsIndex}`}
+              >
+                <span class="mobile-nav-indicator"></span>
+                <span>Projects</span>
+              </a>
+            )
+          }
+          <a
             href="/posts"
             class:list={["mobile-nav-link", { active: isActive("/posts") }]}
-            style="--i:0"
+            style={`--i:${postsIndex}`}
           >
             <span class="mobile-nav-indicator"></span>
             <span>Posts</span>
@@ -44,25 +69,17 @@ const isActive = (path: string) => {
           <a
             href="/tags"
             class:list={["mobile-nav-link", { active: isActive("/tags") }]}
-            style="--i:1"
+            style={`--i:${tagsIndex}`}
           >
             <span class="mobile-nav-indicator"></span>
             <span>Tags</span>
-          </a>
-          <a
-            href="/about"
-            class:list={["mobile-nav-link", { active: isActive("/about") }]}
-            style="--i:2"
-          >
-            <span class="mobile-nav-indicator"></span>
-            <span>About</span>
           </a>
           {
             navPages.map((page, index) => (
               <a
                 href={page.href}
                 class:list={["mobile-nav-link", { active: isActive(page.href) }]}
-                style={`--i:${3 + index}`}
+                style={`--i:${navStartIndex + index}`}
               >
                 <span class="mobile-nav-indicator"></span>
                 <span>{page.label}</span>

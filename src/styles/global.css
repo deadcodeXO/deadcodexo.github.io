@@ -43,6 +43,14 @@ i {
   font-family: var(--font-sriracha);
 }
 
+.page-hero-subtitle {
+  font-family: var(--font-app);
+  font-style: normal;
+  font-weight: 450;
+  line-height: 1.65;
+  letter-spacing: 0.01em;
+}
+
 @layer base {
   * {
     @apply border-border outline-accent/75;

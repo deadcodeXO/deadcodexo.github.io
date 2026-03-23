@@ -98,6 +98,15 @@ const nextPost =
     class:list={["relative app-layout pb-12", { "mt-8": !SITE.showBackButton }]}
     data-pagefind-body
   >
+    <time
+      class="sr-only"
+      datetime={pubDatetime.toISOString()}
+      data-pagefind-meta="published"
+      aria-hidden="true"
+    >
+      {pubDatetime.toISOString()}
+    </time>
+
     <!-- Post header section -->
     <header class="post-header relative mb-10 text-center">
       <div class="post-hero-bg"></div>

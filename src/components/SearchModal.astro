@@ -246,6 +246,27 @@ import "@pagefind/default-ui/css/ui.css";
         // @ts-expect-error — Missing types for @pagefind/default-ui package.
         const { PagefindUI } = await import("@pagefind/default-ui");
 
+        const formatSearchDate = (rawValue: unknown): string | null => {
+          if (typeof rawValue !== "string" || rawValue.trim() === "") return null;
+          const parsedDate = new Date(rawValue);
+          if (Number.isNaN(parsedDate.getTime())) return null;
+
+          return new Intl.DateTimeFormat("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          }).format(parsedDate);
+        };
+
+        const withPublishedDate = (data: Record<string, any>) => {
+          const publishedDate = formatSearchDate(data?.meta?.published);
+          if (!publishedDate || typeof data?.excerpt !== "string") return data;
+          if (data.excerpt.includes("pagefind-ui__result-date")) return data;
+
+          data.excerpt = `<span class="pagefind-ui__result-date">${publishedDate}</span>${data.excerpt}`;
+          return data;
+        };
+
         // Navigation may have occurred while the module was loading (first load, uncached)
         if (signal.aborted || container.querySelector(".pagefind-ui")) return;
 
@@ -253,6 +274,7 @@ import "@pagefind/default-ui/css/ui.css";
           element: "#modal-pagefind-search",
           showImages: false,
           showSubResults: true,
+          processResult: withPublishedDate,
         });
 
         // Hide empty state when user types

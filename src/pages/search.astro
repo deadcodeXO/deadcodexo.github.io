@@ -133,6 +133,27 @@ const backUrl = SITE.showBackButton ? `${Astro.url.pathname}` : "/";
       // @ts-expect-error — Missing types for @pagefind/default-ui package.
       const { PagefindUI } = await import("@pagefind/default-ui");
 
+      const formatSearchDate = (rawValue: unknown): string | null => {
+        if (typeof rawValue !== "string" || rawValue.trim() === "") return null;
+        const parsedDate = new Date(rawValue);
+        if (Number.isNaN(parsedDate.getTime())) return null;
+
+        return new Intl.DateTimeFormat("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        }).format(parsedDate);
+      };
+
+      const withPublishedDate = (data: Record<string, any>) => {
+        const publishedDate = formatSearchDate(data?.meta?.published);
+        if (!publishedDate || typeof data?.excerpt !== "string") return data;
+        if (data.excerpt.includes("pagefind-ui__result-date")) return data;
+
+        data.excerpt = `<span class="pagefind-ui__result-date">${publishedDate}</span>${data.excerpt}`;
+        return data;
+      };
+
       // Display warning in dev mode
       if (import.meta.env.DEV) {
         pageFindSearch.innerHTML = `
@@ -147,6 +168,7 @@ const backUrl = SITE.showBackButton ? `${Astro.url.pathname}` : "/";
         element: "#pagefind-search",
         showImages: false,
         showSubResults: true,
+        processResult: withPublishedDate,
         translations: {
           placeholder: "Search",
           clear_search: "Clear",

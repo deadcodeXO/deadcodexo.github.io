@@ -99,13 +99,11 @@ const nextPost =
     data-pagefind-body
   >
     <time
-      class="sr-only"
       datetime={pubDatetime.toISOString()}
-      data-pagefind-meta="published"
+      data-pagefind-meta="published[datetime]"
+      data-pagefind-ignore
       aria-hidden="true"
-    >
-      {pubDatetime.toISOString()}
-    </time>
+    ></time>
 
     <!-- Post header section -->
     <header class="post-header relative mb-10 text-center">

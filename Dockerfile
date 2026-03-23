@@ -1,5 +1,5 @@
 # Base stage for building the static files
-FROM node:lts AS base
+FROM node:22-bookworm-slim AS base
 WORKDIR /app
 
 # Install pnpm
@@ -12,6 +12,6 @@ COPY . .
 RUN pnpm run build
 
 # Runtime stage for serving the application
-FROM nginx:mainline-alpine-slim AS runtime
+FROM nginx:1.27-alpine-slim AS runtime
 COPY --from=base /app/dist /usr/share/nginx/html
 EXPOSE 80

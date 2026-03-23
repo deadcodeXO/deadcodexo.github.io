@@ -1,6 +1,6 @@
 services:
   app:
-    image: node:lts
+    image: node:22-bookworm-slim
     ports:
       - 4321:4321
     working_dir: /app

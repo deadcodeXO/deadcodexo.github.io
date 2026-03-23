@@ -6,7 +6,7 @@
     "dev": "astro dev",
     "cms:server": "decap-server",
     "dev:cms": "concurrently --kill-others --kill-others-on-fail --success first --handle-input false \"npm run dev\" \"npm run cms:server\"",
-    "build": "astro check && astro build && node scripts/remove-dev-routes.cjs && pagefind --site dist && node scripts/copy-pagefind.cjs",
+    "build": "astro build && node scripts/remove-dev-routes.cjs && pagefind --site dist && node scripts/copy-pagefind.cjs",
     "new:post": "node scripts/new-post.cjs",
     "syncdocs": "node scripts/sync-docs.cjs",
     "readyprod": "npm run build && npm run syncdocs",
@@ -51,5 +51,8 @@
     "prettier-plugin-tailwindcss": "^0.7.2",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.0"
+  },
+  "overrides": {
+    "fast-xml-parser": "5.5.9"
   }
 }

@@ -22,10 +22,15 @@ dev-server.err.log
 
 # environment variables
 .env
-.env.production
+.env.*
+!.env.example
 
 # macOS-specific files
 .DS_Store
+
+# Windows-specific files
+Thumbs.db
+Desktop.ini
 
 # jetbrains setting folder
 .idea/
@@ -35,3 +40,7 @@ dev-server.err.log
 public/pagefind
 .vercel
 IDIOT.md
+
+# local screenshots / captures (do not publish from repo root)
+newss*.png
+neweditor.png

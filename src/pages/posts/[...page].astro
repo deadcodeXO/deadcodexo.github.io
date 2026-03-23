@@ -149,6 +149,9 @@ const totalPosts = page.total;
 
       const withPublishedDate = (data: Record<string, any>) => {
         const publishedDate = formatSearchDate(data?.meta?.published);
+        if (data?.meta && "published" in data.meta) {
+          delete data.meta.published;
+        }
         if (!publishedDate || typeof data?.excerpt !== "string") return data;
         if (data.excerpt.includes("pagefind-ui__result-date")) return data;
 

@@ -15,6 +15,54 @@ const { pathname } = Astro.url;
 const currentPath =
   pathname.endsWith("/") && pathname !== "/" ? pathname.slice(0, -1) : pathname;
 const showEditorLink = import.meta.env.DEV;
+const excludedNavPaths = new Set([
+  "/about",
+  "/posts",
+  "/tags",
+  "/search",
+  "/editor",
+  "/edit",
+  "/admin",
+]);
+
+const pageModules = import.meta.glob("../pages/*.md", { eager: true });
+const navPages = Object.entries(pageModules)
+  .map(([filePath, mod]) => {
+    const frontmatter = (mod as { frontmatter?: unknown }).frontmatter as {
+      title?: string;
+      navLabel?: string;
+      navOrder?: number | string;
+      showInNav?: boolean;
+    };
+
+    if (!frontmatter?.showInNav) return null;
+
+    const fileName = filePath.split("/").pop() ?? "";
+    const slug = fileName.replace(/\.md$/, "");
+    if (!slug) return null;
+
+    const href = `/${slug}`;
+    if (excludedNavPaths.has(href)) return null;
+
+    const navOrder = Number(frontmatter.navOrder ?? 100);
+    const pathBits = href.split("/").filter(Boolean);
+    const fallbackLabel = pathBits[pathBits.length - 1] ?? href;
+    const label =
+      frontmatter.navLabel?.trim() ||
+      frontmatter.title?.trim() ||
+      fallbackLabel ||
+      href;
+
+    return {
+      href,
+      label,
+      navOrder: Number.isFinite(navOrder) ? navOrder : 100,
+    };
+  })
+  .filter((page): page is { href: string; label: string; navOrder: number } =>
+    Boolean(page)
+  )
+  .sort((a, b) => a.navOrder - b.navOrder || a.label.localeCompare(b.label));
 
 const isActive = (path: string) => {
   const currentPathArray = currentPath.split("/").filter(p => p.trim());
@@ -93,12 +141,23 @@ const isActive = (path: string) => {
               >
             </li>
             {
+              navPages.map(page => (
+                <li>
+                  <a
+                    href={page.href}
+                    class:list={["nav-link", { "nav-active": isActive(page.href) }]}
+                    >{page.label}</a
+                  >
+                </li>
+              ))
+            }
+            {
               showEditorLink && (
                 <li>
                   <a
-                    href="/edit"
-                    class:list={["nav-link", { "nav-active": isActive("/edit") }]}
-                    >Edit</a
+                    href="/editor"
+                    class:list={["nav-link", { "nav-active": isActive("/editor") }]}
+                    >Editor</a
                   >
                 </li>
               )
@@ -185,7 +244,7 @@ const isActive = (path: string) => {
       </div>
     </div>
   </div>
-  <MobileMenu currentPath={currentPath} />
+  <MobileMenu currentPath={currentPath} navPages={navPages} />
 
   <!-- Bottom border with gradient -->
   <div

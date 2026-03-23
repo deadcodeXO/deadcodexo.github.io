@@ -1,0 +1,162 @@
+---
+import type { ImageMetadata } from "astro";
+import type { CollectionEntry } from "astro:content";
+import { getCollection } from "astro:content";
+import Layout from "@/layouts/Layout.astro";
+import Header from "@/components/Header.astro";
+import Footer from "@/components/Footer.astro";
+import Breadcrumb from "@/components/Breadcrumb.astro";
+import GalleryCard from "@/components/GalleryCard.astro";
+import { SITE } from "@/config";
+
+const galleries = await getCollection("galleries", ({ data }) => !data.draft);
+
+const sortedGalleries = galleries.sort(
+  (a, b) => b.data.pubDatetime.valueOf() - a.data.pubDatetime.valueOf()
+);
+
+const allImages = import.meta.glob<{ default: ImageMetadata }>(
+  "/src/data/galleries/**/*.{jpg,jpeg,png,webp,avif,gif,JPG,JPEG,PNG,WEBP}",
+  { eager: true }
+);
+
+function getGallerySlug(gallery: CollectionEntry<"galleries">): string {
+  return gallery.id
+    .replace(/\\/g, "/")
+    .replace(/\/index\.(md|mdx)$/i, "")
+    .replace(/\.(md|mdx)$/i, "")
+    .replace(/\/index$/i, "");
+}
+
+const galleryCards = sortedGalleries.map(gallery => {
+  const slug = getGallerySlug(gallery);
+  const folderPrefix = `/src/data/galleries/${slug}/`;
+
+  const images = Object.entries(allImages)
+    .filter(([filePath]) => filePath.startsWith(folderPrefix))
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, mod]) => mod.default);
+
+  return {
+    gallery,
+    slug,
+    imageCount: images.length,
+    fallbackImage: images[0],
+  };
+});
+---
+
+<Layout title={`Galleries | ${SITE.title}`}>
+  <Header />
+  <Breadcrumb />
+  <main id="main-content" class="app-layout pb-12">
+    <section class="galleries-hero">
+      <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">
+        <span class="glow-text">Galleries</span>
+      </h1>
+      <p class="mt-3 max-w-2xl text-foreground/70 italic">
+        Visual collections from posts, experiments, and side projects.
+      </p>
+      <div class="mt-4 flex items-center gap-2">
+        <span class="hero-badge">
+          {galleryCards.length} {galleryCards.length === 1 ? "gallery" : "galleries"}
+        </span>
+      </div>
+    </section>
+
+    {
+      galleryCards.length === 0 ? (
+        <div class="empty-state">
+          <h2 class="text-lg font-semibold">No galleries published yet</h2>
+          <p class="mt-2 text-sm opacity-70">
+            Create one from the editor and publish when ready.
+          </p>
+        </div>
+      ) : (
+        <ul class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 [&>li]:my-0">
+          {galleryCards.map(item => (
+            <li>
+              <GalleryCard
+                gallery={item.gallery}
+                slug={item.slug}
+                fallbackImage={item.fallbackImage}
+                imageCount={item.imageCount}
+              />
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </main>
+  <Footer />
+</Layout>
+
+<script>
+  document.addEventListener("astro:page-load", () => {
+    // Keep gallery card glow behavior consistent with other card lists.
+    document.querySelectorAll<HTMLElement>(".card-glow").forEach(card => {
+      card.addEventListener("mousemove", (e: MouseEvent) => {
+        const rect = card.getBoundingClientRect();
+        card.style.setProperty("--mouse-x", `${e.clientX - rect.left}px`);
+        card.style.setProperty("--mouse-y", `${e.clientY - rect.top}px`);
+      });
+    });
+  });
+</script>
+
+<style>
+  .galleries-hero {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1.5rem;
+    padding: 2.5rem 2rem;
+    margin-bottom: 2rem;
+    background: color-mix(
+      in srgb,
+      var(--color-foreground) 3%,
+      var(--color-background)
+    );
+    border: 1px solid color-mix(in srgb, var(--color-accent) 12%, transparent);
+  }
+
+  @media (min-width: 640px) {
+    .galleries-hero {
+      padding: 3rem;
+    }
+  }
+
+  .glow-text {
+    background: linear-gradient(
+      135deg,
+      var(--color-foreground),
+      var(--color-accent)
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(
+      0 0 20px color-mix(in srgb, var(--color-accent) 20%, transparent)
+    );
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.3rem 0.85rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-accent);
+    background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-accent) 15%, transparent);
+    backdrop-filter: blur(8px);
+  }
+
+  .empty-state {
+    border-radius: 1rem;
+    border: 1px solid color-mix(in srgb, var(--color-border) 25%, transparent);
+    background: color-mix(in srgb, var(--color-muted) 15%, transparent);
+    padding: 1rem 1.25rem;
+  }
+</style>

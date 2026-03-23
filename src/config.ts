@@ -10,7 +10,7 @@ export const SITE = {
   postPerPage: 8,
   scheduledPostMargin: 15 * 60 * 1000, // 15 minutes
   showArchives: true,
-  showGalleries: false,
+  showGalleries: true,
   showBackButton: true,
   editPost: {
     enabled: false,

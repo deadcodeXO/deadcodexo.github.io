@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const distDir = path.join(process.cwd(), "dist");
-const devOnlyRoutes = ["edit", "admin"];
+const devOnlyRoutes = ["editor", "edit", "admin"];
 
 for (const route of devOnlyRoutes) {
   const routePath = path.join(distDir, route);

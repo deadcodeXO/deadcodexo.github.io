@@ -11,6 +11,7 @@ public_folder: /uploads
 collections:
   - name: blog
     label: Blog
+    label_singular: Post
     folder: src/data/blog
     create: true
     extension: md
@@ -33,11 +34,13 @@ collections:
 
   - name: galleries
     label: Galleries
+    label_singular: Gallery
     folder: src/data/galleries
     create: true
     extension: md
     format: frontmatter
-    slug: "{{slug}}/index"
+    slug: "{{slug}}"
+    path: "{{slug}}/index"
     media_folder: ""
     public_folder: ""
     fields:
@@ -51,6 +54,7 @@ collections:
 
   - name: pages
     label: Pages
+    label_singular: Page
     folder: src/pages
     create: true
     extension: md
@@ -60,4 +64,7 @@ collections:
       - { label: Layout, name: layout, widget: hidden, default: ../layouts/PageLayout.astro }
       - { label: Title, name: title, widget: string }
       - { label: Description, name: description, widget: text, required: false }
+      - { label: Show In Navigation, name: showInNav, widget: boolean, default: false, required: false }
+      - { label: Navigation Label, name: navLabel, widget: string, required: false }
+      - { label: Navigation Order, name: navOrder, widget: number, value_type: int, default: 100, min: 0, required: false }
       - { label: Body, name: body, widget: markdown }

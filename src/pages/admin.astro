@@ -8,6 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
     <link href="/admin/config.yml" type="text/yaml" rel="cms-config-url" />
+    <link rel="stylesheet" href="/admin/custom.css" />
     <title>Devosfera CMS</title>
   </head>
   <body>
@@ -17,6 +18,326 @@
       if (window.location.pathname === "/admin") {
         window.location.replace("/admin/");
       }
+    </script>
+    <script is:inline>
+      (() => {
+        const THEME_KEY = "theme";
+        const DARK = "dark";
+        const LIGHT = "light";
+
+        const sanitizeTheme = (value) => (value === LIGHT ? LIGHT : DARK);
+
+        const detectTheme = () => {
+          const storedTheme = localStorage.getItem(THEME_KEY);
+          if (storedTheme === LIGHT || storedTheme === DARK) {
+            return storedTheme;
+          }
+
+          try {
+            const parentTheme = window.parent?.document?.documentElement?.getAttribute(
+              "data-theme"
+            );
+            if (parentTheme === LIGHT || parentTheme === DARK) {
+              return parentTheme;
+            }
+          } catch {
+            // Access to parent may fail in some contexts; ignore.
+          }
+
+          return window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? DARK
+            : LIGHT;
+        };
+
+        const applyTheme = (value) => {
+          document.documentElement.setAttribute("data-theme", sanitizeTheme(value));
+        };
+
+        applyTheme(detectTheme());
+
+        window.addEventListener("storage", event => {
+          if (event.key === THEME_KEY) {
+            applyTheme(detectTheme());
+          }
+        });
+
+        window.addEventListener("message", event => {
+          if (event.origin !== window.location.origin) return;
+          if (event.data?.type !== "site-theme") return;
+          applyTheme(event.data.value);
+        });
+
+        try {
+          if (window.parent && window.parent !== window) {
+            const parentElement = window.parent.document.documentElement;
+            const observer = new MutationObserver(() => applyTheme(detectTheme()));
+            observer.observe(parentElement, {
+              attributes: true,
+              attributeFilter: ["data-theme"],
+            });
+          }
+        } catch {
+          // Ignore parent observation failures.
+        }
+      })();
+    </script>
+    <script is:inline>
+      (() => {
+        const ROW_CLASS = "dcx-dark-row";
+        const LABEL_CLASS = "dcx-dark-field-label";
+        const TOOLBAR_CLASS = "dcx-dark-toolbar";
+        const TOOLBAR_TITLE_CLASS = "dcx-dark-toolbar-title";
+        const PREVIEW_CLASS = "dcx-dark-preview";
+        const FIELD_PATTERNS = [
+          /^TITLE\b/i,
+          /^DESCRIPTION\b/i,
+          /^PUBLISH(?:ED)? DATE\b/i,
+          /^MODIFIED DATE\b/i,
+          /^AUTHOR\b/i,
+          /^FEATURED\b/i,
+          /^DRAFT\b/i,
+          /^TAGS\b/i,
+          /^OPEN GRAPH IMAGE\b/i,
+          /^CANONICAL URL\b/i,
+          /^HIDE EDIT POST LINK\b/i,
+          /^TIMEZONE\b/i,
+          /^BODY\b/i,
+        ];
+
+        const normalizeText = (value) =>
+          (value ?? "").replace(/\s+/g, " ").trim();
+
+        const isDarkTheme = () =>
+          document.documentElement.getAttribute("data-theme") === "dark";
+
+        const clearClasses = root => {
+          root.querySelectorAll(`.${ROW_CLASS}`).forEach(el =>
+            el.classList.remove(ROW_CLASS)
+          );
+          root.querySelectorAll(`.${LABEL_CLASS}`).forEach(el =>
+            el.classList.remove(LABEL_CLASS)
+          );
+          root.querySelectorAll(`.${TOOLBAR_CLASS}`).forEach(el =>
+            el.classList.remove(TOOLBAR_CLASS)
+          );
+          root.querySelectorAll(`.${TOOLBAR_TITLE_CLASS}`).forEach(el =>
+            el.classList.remove(TOOLBAR_TITLE_CLASS)
+          );
+          root.querySelectorAll(`.${PREVIEW_CLASS}`).forEach(el =>
+            el.classList.remove(PREVIEW_CLASS)
+          );
+        };
+
+        const findFieldRowContainer = startEl => {
+          let node = startEl.closest("div,section,article,li");
+          while (node) {
+            if (
+              node.querySelector(
+                'input, textarea, select, button, [role="button"]'
+              )
+            ) {
+              return node;
+            }
+            node = node.parentElement?.closest("div,section,article,li") ?? null;
+          }
+          return null;
+        };
+
+        const markTargetFieldRows = root => {
+          root.querySelectorAll("label,legend,span,div").forEach(el => {
+            const text = normalizeText(el.textContent);
+            if (!text || text.length > 80) return;
+            if (!FIELD_PATTERNS.some(pattern => pattern.test(text))) return;
+
+            el.classList.add(LABEL_CLASS);
+            const row = findFieldRowContainer(el);
+            if (row) row.classList.add(ROW_CLASS);
+          });
+        };
+
+        const markToolbar = root => {
+          const markToolbarTitle = toolbarRoot => {
+            if (!toolbarRoot) return;
+            Array.from(
+              toolbarRoot.querySelectorAll(
+                "div,section,article,header,nav,span,p,a,button,strong,small"
+              )
+            ).forEach(el => {
+              const text = normalizeText(el.textContent).toLowerCase();
+              if (!text.includes("writing in") || !text.includes("collection")) {
+                return;
+              }
+
+              el.classList.add(TOOLBAR_TITLE_CLASS);
+              const interactive = el.closest(
+                "a,button,[role='button'],div,section,article,header,nav"
+              );
+              if (interactive) {
+                interactive.classList.add(TOOLBAR_TITLE_CLASS);
+                interactive.parentElement?.classList.add(TOOLBAR_TITLE_CLASS);
+              }
+            });
+          };
+
+          const addToolbarClass = el => {
+            if (!el) return;
+            el.classList.add(TOOLBAR_CLASS);
+            const parent = el.parentElement?.closest(
+              "header,nav,section,article,div"
+            );
+            if (parent) parent.classList.add(TOOLBAR_CLASS);
+            markToolbarTitle(el);
+            if (parent) markToolbarTitle(parent);
+          };
+
+          const tablist = root.querySelector('[role="tablist"]');
+          if (tablist) {
+            const toolbarContainer =
+              tablist.closest("header,nav,section,article,div") ??
+              tablist.parentElement;
+            addToolbarClass(toolbarContainer);
+            return;
+          }
+
+          // Fallback for entry editor header: "Writing in ... collection" + actions
+          const textCandidate = Array.from(
+            root.querySelectorAll("div,section,article,header,nav")
+          ).find(el => {
+            const text = normalizeText(el.textContent).toLowerCase();
+            if (!text.includes("writing in") || !text.includes("collection")) {
+              return false;
+            }
+            return Boolean(
+              el.querySelector('button,select,[role="button"],a[href*="publish"]')
+            );
+          });
+
+          if (textCandidate) {
+            const toolbarContainer =
+              textCandidate.closest("header,nav,section,article,div") ??
+              textCandidate;
+            addToolbarClass(toolbarContainer);
+            return;
+          }
+
+          // Final fallback: action row containing publish/delete
+          const actionCandidate = Array.from(
+            root.querySelectorAll("div,section,article,header,nav")
+          ).find(el => {
+            const text = normalizeText(el.textContent).toLowerCase();
+            return text.includes("publish") && text.includes("delete entry");
+          });
+          if (actionCandidate) {
+            addToolbarClass(
+              actionCandidate.closest("header,nav,section,article,div") ??
+                actionCandidate
+            );
+          }
+        };
+
+        const markPreviewPane = root => {
+          const candidates = Array.from(
+            root.querySelectorAll("div,section,article")
+          ).filter(el => {
+            if (!el.querySelector("h1,h2,h3,p")) return false;
+            if (el.querySelector("label,input,textarea,select")) return false;
+            const rect = el.getBoundingClientRect();
+            return rect.width > 220 && rect.height > 200;
+          });
+
+          if (!candidates.length) return;
+          candidates.sort((a, b) => {
+            const ar = a.getBoundingClientRect();
+            const br = b.getBoundingClientRect();
+            return br.width * br.height - ar.width * ar.height;
+          });
+          candidates[0].classList.add(PREVIEW_CLASS);
+        };
+
+        const stylePreviewIframes = root => {
+          root.querySelectorAll("iframe").forEach(frame => {
+            try {
+              const doc = frame.contentDocument;
+              if (!doc) return;
+
+              let styleEl = doc.getElementById("dcx-preview-theme");
+              if (!isDarkTheme()) {
+                if (styleEl) styleEl.remove();
+                return;
+              }
+
+              if (!styleEl) {
+                styleEl = doc.createElement("style");
+                styleEl.id = "dcx-preview-theme";
+                (doc.head || doc.documentElement).appendChild(styleEl);
+              }
+
+              styleEl.textContent = `
+                html, body {
+                  background: #161b24 !important;
+                  color: #eaf3ff !important;
+                }
+                h1, h2, h3, h4, h5, h6, p, li, span, strong, em {
+                  color: #c8e6ff !important;
+                }
+                a {
+                  color: #53b0ff !important;
+                }
+              `;
+            } catch {
+              // Cross-origin or inaccessible iframe; ignore.
+            }
+          });
+        };
+
+        const applyTargetedDarkClasses = () => {
+          const root = document.getElementById("nc-root");
+          if (!root) return;
+
+          clearClasses(root);
+          stylePreviewIframes(root);
+          if (!isDarkTheme()) return;
+
+          markTargetFieldRows(root);
+          markToolbar(root);
+          markPreviewPane(root);
+        };
+
+        let scheduled = false;
+        const scheduleApply = () => {
+          if (scheduled) return;
+          scheduled = true;
+          requestAnimationFrame(() => {
+            scheduled = false;
+            applyTargetedDarkClasses();
+          });
+        };
+
+        const init = () => {
+          const root = document.getElementById("nc-root");
+          if (!root) {
+            setTimeout(init, 150);
+            return;
+          }
+
+          const observer = new MutationObserver(scheduleApply);
+          observer.observe(root, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+          });
+
+          window.addEventListener("message", scheduleApply);
+          window.addEventListener("storage", scheduleApply);
+          document.addEventListener("visibilitychange", scheduleApply);
+
+          // Decap mounts asynchronously and updates during route changes.
+          setInterval(scheduleApply, 1200);
+          scheduleApply();
+        };
+
+        init();
+      })();
     </script>
     <script
       is:inline

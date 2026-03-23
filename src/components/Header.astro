@@ -14,6 +14,7 @@ const { pathname } = Astro.url;
 // Remove trailing slash from current pathname if exists
 const currentPath =
   pathname.endsWith("/") && pathname !== "/" ? pathname.slice(0, -1) : pathname;
+const showEditorLink = import.meta.env.DEV;
 
 const isActive = (path: string) => {
   const currentPathArray = currentPath.split("/").filter(p => p.trim());
@@ -91,6 +92,17 @@ const isActive = (path: string) => {
                 >About</a
               >
             </li>
+            {
+              showEditorLink && (
+                <li>
+                  <a
+                    href="/edit"
+                    class:list={["nav-link", { "nav-active": isActive("/edit") }]}
+                    >Edit</a
+                  >
+                </li>
+              )
+            }
             <li class="flex items-center">
               <a
                 href="/search"

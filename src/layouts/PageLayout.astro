@@ -1,0 +1,26 @@
+---
+import type { MarkdownLayoutProps } from "astro";
+import Header from "@/components/Header.astro";
+import Footer from "@/components/Footer.astro";
+import Main from "@/layouts/Main.astro";
+import Layout from "./Layout.astro";
+import { SITE } from "@/config";
+
+const { frontmatter } = Astro.props as MarkdownLayoutProps<{
+  title: string;
+  description?: string;
+}>;
+---
+
+<Layout
+  title={`${frontmatter.title} | ${SITE.title}`}
+  description={frontmatter.description ?? SITE.desc}
+>
+  <Header />
+  <Main pageTitle={frontmatter.title} pageDesc={frontmatter.description}>
+    <article class="app-prose mb-28 max-w-app prose-img:border-0">
+      <slot />
+    </article>
+  </Main>
+  <Footer />
+</Layout>

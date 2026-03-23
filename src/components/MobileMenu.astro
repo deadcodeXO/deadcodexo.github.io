@@ -9,6 +9,7 @@ interface Props {
 }
 
 const { currentPath } = Astro.props;
+const showEditorLink = import.meta.env.DEV;
 
 const isActive = (path: string) => {
   const currentPathArray = currentPath.split("/").filter((p) => p.trim());
@@ -52,6 +53,18 @@ const isActive = (path: string) => {
             <span class="mobile-nav-indicator"></span>
             <span>About</span>
           </a>
+          {
+            showEditorLink && (
+              <a
+                href="/edit"
+                class:list={["mobile-nav-link", { active: isActive("/edit") }]}
+                style="--i:2.5"
+              >
+                <span class="mobile-nav-indicator"></span>
+                <span>Edit</span>
+              </a>
+            )
+          }
           {
             SITE.showArchives && (
               <a

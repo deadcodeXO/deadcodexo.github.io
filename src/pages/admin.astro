@@ -1,0 +1,27 @@
+---
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <link href="/admin/config.yml" type="text/yaml" rel="cms-config-url" />
+    <title>Devosfera CMS</title>
+  </head>
+  <body>
+    <noscript>Decap CMS requires JavaScript enabled.</noscript>
+    <div id="nc-root"></div>
+    <script is:inline>
+      if (window.location.pathname === "/admin") {
+        window.location.replace("/admin/");
+      }
+    </script>
+    <script
+      is:inline
+      defer
+      src="https://unpkg.com/decap-cms@^3.0.0/dist/decap-cms.js"
+    ></script>
+  </body>
+</html>

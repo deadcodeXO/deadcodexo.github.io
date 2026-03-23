@@ -159,11 +159,29 @@ const totalPosts = page.total;
         if (data?.meta && "published" in data.meta) {
           delete data.meta.published;
         }
-        if (!publishedDate || typeof data?.excerpt !== "string") return data;
-        if (data.excerpt.includes("pagefind-ui__result-date")) return data;
+        if (!publishedDate) return data;
 
-        const dateRow = `<span class="pagefind-ui__result-date">${dateIconSvg}<time class="pagefind-ui__result-date-text" datetime="${publishedDate.iso}">${publishedDate.display}</time></span>`;
-        data.excerpt = `${dateRow}${data.excerpt}`;
+        const dateRow = `<span class="pagefind-ui__result-date">${dateIconSvg}<time class="pagefind-ui__result-date-text" datetime="${publishedDate.iso}">${publishedDate.display}</time></span><br />`;
+
+        if (
+          typeof data?.excerpt === "string" &&
+          !data.excerpt.includes("pagefind-ui__result-date")
+        ) {
+          data.excerpt = `${dateRow}${data.excerpt}`;
+        }
+
+        if (Array.isArray(data?.sub_results)) {
+          data.sub_results = data.sub_results.map((subResult: Record<string, any>) => {
+            if (
+              typeof subResult?.excerpt === "string" &&
+              !subResult.excerpt.includes("pagefind-ui__result-date")
+            ) {
+              subResult.excerpt = `${dateRow}${subResult.excerpt}`;
+            }
+            return subResult;
+          });
+        }
+
         return data;
       };
 

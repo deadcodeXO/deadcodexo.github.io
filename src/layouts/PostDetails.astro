@@ -46,7 +46,17 @@ if (typeof initOgImage === "string") {
 
 // Use dynamic OG image if enabled and no remote|local ogImage
 if (!ogImageUrl && SITE.dynamicOgImage) {
-  ogImageUrl = `${getPath(post.id, post.filePath)}/index.png`;
+  const baseOgPath = `${getPath(post.id, post.filePath)}/index.png`;
+  const versionSource = modDatetime ?? pubDatetime;
+  const versionMs =
+    versionSource instanceof Date
+      ? versionSource.getTime()
+      : versionSource
+        ? new Date(versionSource).getTime()
+        : Date.now();
+  const version = Number.isFinite(versionMs) ? versionMs.toString(36) : "0";
+  // Force social crawlers (Discord/Twitter/etc.) to fetch fresh OG cards.
+  ogImageUrl = `${baseOgPath}?v=og2-${version}`;
 }
 
 // Resolve OG image URL (or fallback to SITE.ogImage / default `og.png`)

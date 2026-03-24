@@ -1,6 +1,7 @@
 {
   "name": "devosfera",
   "type": "module",
+  "main": "electron/main.js",
   "version": "1.0.0",
   "scripts": {
     "dev": "astro dev",
@@ -13,6 +14,9 @@
     "preview": "astro preview",
     "sync": "astro sync",
     "astro": "astro",
+    "cms:app": "electron .",
+    "cms:app:portable": "electron-builder --win portable",
+    "cms:app:installer": "electron-builder --win nsis",
     "format:check": "prettier --check .",
     "format": "prettier --write .",
     "lint": "eslint ."
@@ -22,9 +26,13 @@
     "@astrojs/rss": "^4.0.17",
     "@astrojs/sitemap": "^3.7.1",
     "@resvg/resvg-js": "^2.6.2",
+    "@shikijs/transformers": "^3.23.0",
+    "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.1.18",
     "astro": "^6.0.8",
+    "concurrently": "^9.2.1",
     "dayjs": "^1.11.19",
+    "decap-server": "^3.5.2",
     "lodash.kebabcase": "^4.1.1",
     "remark-collapse": "^0.1.2",
     "remark-toc": "^9.0.0",
@@ -36,12 +44,10 @@
   "devDependencies": {
     "@astrojs/check": "^0.9.7",
     "@pagefind/default-ui": "^1.4.0",
-    "@shikijs/transformers": "^3.22.0",
-    "@tailwindcss/typography": "^0.5.19",
     "@types/lodash.kebabcase": "^4.1.9",
     "@typescript-eslint/parser": "^8.57.0",
-    "concurrently": "^9.2.1",
-    "decap-server": "^3.5.2",
+    "electron": "^41.0.3",
+    "electron-builder": "^26.8.1",
     "eslint": "^10.0.0",
     "eslint-plugin-astro": "^1.6.0",
     "globals": "^17.3.0",
@@ -51,6 +57,30 @@
     "prettier-plugin-tailwindcss": "^0.7.2",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.0"
+  },
+  "build": {
+    "appId": "net.functionabuse.deadcodexo.cms",
+    "productName": "DeadCodeXO CMS",
+    "asar": true,
+    "files": [
+      "**/*",
+      "!electron.md",
+      "!**/*.map"
+    ],
+    "directories": {
+      "output": "release",
+      "app": "electron"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    }
   },
   "overrides": {
     "fast-xml-parser": "5.5.9"

@@ -1,0 +1,7 @@
+{
+  "name": "deadcodexo-cms-launcher",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "main.js",
+  "private": true
+}

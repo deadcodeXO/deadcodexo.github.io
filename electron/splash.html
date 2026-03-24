@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Starting CMS</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      body {
+        margin: 0;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background:
+          radial-gradient(circle at 20% 10%, rgba(0, 143, 236, 0.2), transparent 45%),
+          radial-gradient(circle at 80% 90%, rgba(34, 100, 227, 0.2), transparent 40%),
+          #0f1218;
+        color: #d7e3ff;
+        font-family:
+          "Segoe UI",
+          "Wotfard",
+          system-ui,
+          -apple-system,
+          sans-serif;
+      }
+
+      .panel {
+        width: 100%;
+        max-width: 300px;
+        padding: 24px;
+        text-align: center;
+        border-radius: 16px;
+        border: 1px solid rgba(124, 173, 255, 0.3);
+        background: rgba(16, 19, 26, 0.75);
+        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(10px);
+      }
+
+      img {
+        width: 96px;
+        height: 96px;
+        border-radius: 18px;
+        animation: pulse 1.8s ease-in-out infinite;
+      }
+
+      p {
+        margin: 16px 0 0;
+        font-size: 0.95rem;
+        opacity: 0.9;
+      }
+
+      .subtle {
+        margin-top: 6px;
+        font-size: 0.8rem;
+        color: #8eb8ff;
+        opacity: 0.95;
+      }
+
+      @keyframes pulse {
+        0% {
+          transform: scale(0.96);
+          opacity: 0.7;
+        }
+        50% {
+          transform: scale(1.04);
+          opacity: 1;
+        }
+        100% {
+          transform: scale(0.96);
+          opacity: 0.7;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="panel">
+      <img src="./logo.png" alt="DeadCodeXO logo" />
+      <p>Starting content editor...</p>
+      <div class="subtle">Launching Astro + Decap CMS</div>
+    </div>
+  </body>
+</html>

@@ -40,6 +40,13 @@ const isDev = import.meta.env.DEV;
           if (window.__cmsThemeSyncInitialized) return;
           window.__cmsThemeSyncInitialized = true;
 
+          const resolveCmsFrameSrc = () => {
+            const search = new URLSearchParams(window.location.search);
+            const proxyPort = search.get("cms_proxy_port");
+            if (!proxyPort || !/^\d+$/.test(proxyPort)) return "/admin/";
+            return `/admin/?cms_proxy_port=${encodeURIComponent(proxyPort)}`;
+          };
+
           const sendThemeToCmsFrame = () => {
             const frame = document.getElementById("cms-frame");
             if (!frame || !frame.contentWindow) return;
@@ -58,6 +65,11 @@ const isDev = import.meta.env.DEV;
           const setupCmsThemeSync = () => {
             const frame = document.getElementById("cms-frame");
             if (!frame) return;
+
+            const nextSrc = resolveCmsFrameSrc();
+            if (frame.getAttribute("src") !== nextSrc) {
+              frame.setAttribute("src", nextSrc);
+            }
 
             frame.addEventListener("load", sendThemeToCmsFrame);
             sendThemeToCmsFrame();

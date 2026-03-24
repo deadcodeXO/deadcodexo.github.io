@@ -193,6 +193,15 @@ const structuredData = pubDatetime
       <div class="site-grain"></div>
     </div>
 
+    <div id="window-title-bar">
+      <div class="title">DEADCODEXO</div>
+      <div class="window-controls">
+        <button id="minimize-btn" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
+        <button id="maximize-btn" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg></button>
+        <button id="close-btn" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+      </div>
+    </div>
+
     <slot />
 
     <SearchModal />
@@ -290,6 +299,322 @@ const structuredData = pubDatetime
     mix-blend-mode: overlay;
     pointer-events: none;
   }
+
+  body {
+    padding-top: 30px;
+  }
+
+  #window-title-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 30px;
+    background: #202225;
+    color: #5f97c5;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 10px;
+    -webkit-app-region: drag;
+    z-index: 10000;
+    font-size: 13px;
+    font-weight: 500;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  #window-title-bar .title {
+    flex: 1;
+  }
+
+  #window-title-bar .window-controls {
+    display: flex;
+    gap: 0;
+  }
+
+  #window-title-bar button {
+    -webkit-app-region: no-drag;
+    background: none;
+    border: none;
+    color: #5f97c5;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 30px;
+    transition: background-color 0.2s;
+    font-weight: normal;
+    pointer-events: auto;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  #window-title-bar button:hover {
+    background: rgba(95, 151, 197, 0.2);
+  }
+
+  #close-btn:hover {
+    background: rgba(95, 151, 197, 0.2);
+  }
+
+  html[data-theme="light"] #window-title-bar {
+    background: #f8f9fa;
+    color: #5f97c5;
+  }
+
+  /* CMS UI Styles */
+  #readyprod-ui {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+    pointer-events: none;
+  }
+  #readyprod-button {
+    pointer-events: auto;
+    font-size: 0.85rem;
+    padding: 0.45rem 0.85rem;
+    border: 1px solid #5f97c5;
+    border-radius: 0.35rem;
+    background: rgba(16, 18, 26, 0.96);
+    color: #d9e5ff;
+    cursor: pointer;
+  }
+  #readyprod-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  html[data-theme="light"] #readyprod-button {
+    background: rgba(248, 249, 250, 0.96);
+    color: #212529;
+    border-color: #5f97c5;
+  }
+  .readyprod-toast {
+    min-width: 260px;
+    max-width: 320px;
+    padding: 0.55rem 0.75rem;
+    border-radius: 0.45rem;
+    background: rgba(15, 17, 24, 0.95);
+    color: #eaf3ff;
+    border: 1px solid #5f97c5;
+    box-shadow: 0 8px 22px rgba(0,0,0,0.45);
+    font-size: 0.8rem;
+    line-height: 1.3;
+    word-wrap: break-word;
+    pointer-events: auto;
+  }
+  .readyprod-toast.hidden { display: none; }
+  .console-pane {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 200px;
+    background: rgba(0, 0, 0, 0.9);
+    border-top: 1px solid #5f97c5;
+    display: flex;
+    flex-direction: column;
+    z-index: 1000;
+  }
+  .console-pane.minimized {
+    height: 45px;
+  }
+  .console-output {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem;
+    font-family: monospace;
+    font-size: 0.75rem;
+    color: #eaf3ff;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    transition: max-height 0.3s ease;
+  }
+  .console-pane.minimized .console-output {
+    max-height: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+  .console-header {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 0.5rem;
+    background: rgba(16, 18, 26, 0.9);
+    border-bottom: 1px solid #5f97c5;
+    font-size: 0.8rem;
+    color: #eaf3ff;
+  }
+  .console-buttons {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .console-header button {
+    background: none;
+    border: 1px solid #5f97c5;
+    color: #eaf3ff;
+    padding: 0.2rem 0.5rem;
+    cursor: pointer;
+    border-radius: 0.2rem;
+  }
+  html[data-theme="light"] .console-pane {
+    background: rgba(255, 255, 255, 0.95);
+  }
+  html[data-theme="light"] .console-header {
+    background: rgba(248, 249, 250, 0.95);
+    color: #212529;
+  }
+  html[data-theme="light"] .console-output {
+    color: #212529;
+  }
+  html[data-theme="light"] .console-header button {
+    color: #212529;
+    border-color: #5f97c5;
+  }
+  .status-bar {
+    position: fixed;
+    bottom: 200px;
+    left: 0;
+    right: 0;
+    height: 24px;
+    background: rgba(16, 18, 26, 0.9);
+    border-top: 1px solid #5f97c5;
+    display: flex;
+    align-items: center;
+    padding: 0 1rem;
+    font-size: 0.75rem;
+    color: #eaf3ff;
+    z-index: 999;
+  }
+  html[data-theme="light"] .status-bar {
+    background: rgba(248, 249, 250, 0.9);
+    color: #212529;
+    border-color: #5f97c5;
+  }
+  .settings-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10001;
+  }
+  .settings-modal.hidden { display: none; }
+  .settings-content {
+    background: #202225;
+    color: #eaf3ff;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    min-width: 300px;
+  }
+  html[data-theme="light"] .settings-content {
+    background: #f8f9fa;
+    color: #212529;
+  }
+  .settings-content label {
+    display: block;
+    margin: 0.5rem 0;
+  }
+  .settings-content button {
+    margin: 0.5rem 0.5rem 0 0;
+    padding: 0.5rem;
+    border: 1px solid #5f97c5;
+    background: none;
+    color: #eaf3ff;
+    cursor: pointer;
+  }
+  html[data-theme="light"] .settings-content button {
+    color: #212529;
+  }
+  #settings-btn {
+    font-size: 1rem;
+    width: auto;
+    height: auto;
+    padding: 0.45rem;
+    pointer-events: auto;
+    background: none;
+    border: 1px solid #5f97c5;
+    border-radius: 0.35rem;
+    cursor: pointer;
+  }
+  html[data-theme="light"] #settings-btn {
+    border-color: #5f97c5;
+  }
+  #open-browser-btn {
+    font-size: 0.85rem;
+    padding: 0.45rem 0.85rem;
+    border: 1px solid #5f97c5;
+    border-radius: 0.35rem;
+    background: rgba(16, 18, 26, 0.96);
+    color: #d9e5ff;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+  #open-browser-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  /* Global Build Button */
+  #global-build-ui {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    z-index: 9998;
+  }
+  #global-build-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid #5f97c5;
+    background: rgba(16, 18, 26, 0.9);
+    color: #d9e5ff;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+  #global-build-btn:hover {
+    background: rgba(95, 151, 197, 0.2);
+    transform: scale(1.1);
+  }
+  #global-build-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+  html[data-theme="light"] #global-build-btn {
+    background: rgba(248, 249, 250, 0.9);
+    color: #212529;
+    border-color: #5f97c5;
+  }
+  .global-build-toast {
+    position: absolute;
+    bottom: 50px;
+    right: 0;
+    min-width: 200px;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.45rem;
+    background: rgba(15, 17, 24, 0.95);
+    color: #eaf3ff;
+    border: 1px solid #5f97c5;
+    font-size: 0.8rem;
+    text-align: center;
+  }
+  .global-build-toast.hidden { display: none; }
 </style>
 
 <script>
@@ -333,6 +658,89 @@ const structuredData = pubDatetime
         },
         { signal }
       );
+    }
+
+    // Window controls for Electron
+    if ((window as any).electronAPI && !(window as any).__windowControlsSetUp) {
+      (window as any).__windowControlsSetUp = true;
+      const minimizeBtn = document.getElementById("minimize-btn");
+      const maximizeBtn = document.getElementById("maximize-btn");
+      const closeBtn = document.getElementById("close-btn");
+
+      if (minimizeBtn) {
+        minimizeBtn.addEventListener("click", () => {
+          (window as any).electronAPI!.minimizeWindow().catch(() => {});
+        });
+      }
+
+      if (maximizeBtn) {
+        maximizeBtn.addEventListener("click", () => {
+          (window as any).electronAPI!.maximizeWindow().catch(() => {});
+        });
+      }
+
+      if (closeBtn) {
+        closeBtn.addEventListener("click", () => {
+          (window as any).electronAPI!.closeWindow().catch(() => {});
+        });
+      }
+    }
+
+    // Global build button (only show if Electron API available)
+    const globalBuildUI = document.getElementById("global-build-ui");
+    const globalBuildBtn = document.getElementById("global-build-btn");
+    const globalBuildToast = document.getElementById("global-build-toast");
+
+    if ((window as any).electronAPI && globalBuildUI) {
+      globalBuildUI.style.display = "block";
+
+      if (globalBuildBtn && !(globalBuildBtn as any)._handlerSet) {
+        (globalBuildBtn as any)._handlerSet = true;
+        
+        const showToast = (message: string, type = "info") => {
+          if (globalBuildToast) {
+            globalBuildToast.textContent = message;
+            globalBuildToast.classList.remove("hidden");
+            setTimeout(() => globalBuildToast.classList.add("hidden"), 3000);
+          }
+        };
+
+        globalBuildBtn.addEventListener("click", () => {
+          if (globalBuildBtn.disabled) return;
+          
+          globalBuildBtn.disabled = true;
+          showToast("Building site...", "busy");
+          
+          (window as any).electronAPI!.runReadyProd().catch(() => {
+            globalBuildBtn.disabled = false;
+            showToast("Build failed", "error");
+          });
+        });
+
+        // Listen for build events
+        (window as any).electronAPI!.onReadyProdEvent((payload: any) => {
+          if (!payload) return;
+          
+          if (payload.type === "success") {
+            globalBuildBtn.disabled = false;
+            showToast("Build complete!", "success");
+            if ((window as any).electronAPI) {
+              (window as any).electronAPI!.showNotification("Build Complete", "Your site has been built successfully!").catch(() => {});
+            }
+          } else if (payload.type === "failure" || payload.type === "error") {
+            globalBuildBtn.disabled = false;
+            showToast("Build failed", "error");
+          }
+        });
+
+        // Check initial status
+        (window as any).electronAPI!.getReadyProdStatus().then((status: any) => {
+          if (status?.running) {
+            globalBuildBtn.disabled = true;
+            showToast("Build in progress...", "busy");
+          }
+        });
+      }
     }
   });
 </script>

@@ -163,6 +163,11 @@ ipcMain.handle("minimize-window", () => {
 
 ipcMain.handle("maximize-window", () => {
   if (mainWindow && !mainWindow.isDestroyed()) {
+    // Prevent rapid toggling
+    if (mainWindow.__maximizing) return;
+    mainWindow.__maximizing = true;
+    setTimeout(() => { mainWindow.__maximizing = false; }, 200);
+
     if (mainWindow.isMaximized()) {
       mainWindow.unmaximize();
     } else {

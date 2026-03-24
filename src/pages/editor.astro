@@ -8,15 +8,6 @@ const isDev = import.meta.env.DEV;
 ---
 
 <Layout title="Editor | DEADCODEXO">
-  <div id="window-title-bar">
-    <div class="title">DEADCODEXO CMS</div>
-    <div class="window-controls">
-      <button id="minimize-btn" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
-      <button id="maximize-btn" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg></button>
-      <button id="close-btn" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-    </div>
-  </div>
-
   <Header />
   <Breadcrumb />
   <main id="main-content" class="app-layout pt-3 pb-12">
@@ -141,318 +132,285 @@ const isDev = import.meta.env.DEV;
     )
   }
   <script is:inline>
+    // @ts-ignore
     (() => {
-      const button = document.getElementById("readyprod-button");
-      const openBrowserBtn = document.getElementById("open-browser-btn");
-      const settingsBtn = document.getElementById("settings-btn");
-      const settingsModal = document.getElementById("settings-modal");
-      const autoBuildToggle = document.getElementById("auto-build-toggle");
-      const consoleFontSize = document.getElementById("console-font-size");
-      const saveSettingsBtn = document.getElementById("save-settings");
-      const closeSettingsBtn = document.getElementById("close-settings");
-      const statusText = document.getElementById("status-text");
-      const toast = document.getElementById("readyprod-toast");
-      const consoleOutput = document.getElementById("console-output");
-      const clearConsoleBtn = document.getElementById("clear-console");
-      const toggleConsoleBtn = document.getElementById("toggle-console");
-      const consolePane = document.getElementById("console-pane");
+      const initEditorPage = () => {
+        const button = document.getElementById("readyprod-button");
+        const openBrowserBtn = document.getElementById("open-browser-btn");
+        const settingsBtn = document.getElementById("settings-btn");
+        const settingsModal = document.getElementById("settings-modal");
+        const autoBuildToggle = document.getElementById("auto-build-toggle");
+        const consoleFontSize = document.getElementById("console-font-size");
+        const saveSettingsBtn = document.getElementById("save-settings");
+        const closeSettingsBtn = document.getElementById("close-settings");
+        const statusText = document.getElementById("status-text");
+        const toast = document.getElementById("readyprod-toast");
+        const consoleOutput = document.getElementById("console-output");
+        const clearConsoleBtn = document.getElementById("clear-console");
+        const toggleConsoleBtn = document.getElementById("toggle-console");
+        const consolePane = document.getElementById("console-pane");
 
-      const appendToConsole = (message) => {
-        if (!consoleOutput) return;
-        const timestamp = new Date().toLocaleTimeString();
-        consoleOutput.textContent += `[${timestamp}] ${message}\n`;
-        consoleOutput.scrollTop = consoleOutput.scrollHeight;
-      };
+        const appendToConsole = (message) => {
+          if (!consoleOutput) return;
+          const timestamp = new Date().toLocaleTimeString();
+          consoleOutput.textContent += `[${timestamp}] ${message}\n`;
+          consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        };
 
-      const setStatus = (text) => {
-        if (statusText) statusText.textContent = text;
-      };
+        const setStatus = (text) => {
+          if (statusText) statusText.textContent = text;
+        };
 
-      const setToast = (message, status) => {
-        if (!toast) return;
-        toast.textContent = message;
-        toast.classList.remove("hidden");
-        toast.style.borderColor = status === "success" ? "#42c567" : status === "failure" ? "#f16353" : "#5f97c5";
-        if (status !== "busy") {
-          setTimeout(() => {
-            toast.classList.add("hidden");
-          }, 3600);
+        const setToast = (message, status) => {
+          if (!toast) return;
+          toast.textContent = message;
+          toast.classList.remove("hidden");
+          toast.style.borderColor = status === "success" ? "#42c567" : status === "failure" ? "#f16353" : "#5f97c5";
+          if (status !== "busy") {
+            setTimeout(() => {
+              toast.classList.add("hidden");
+            }, 3600);
+          }
+        };
+        const setButtonEnabled = (enabled) => {
+          if (!button) return;
+          button.disabled = !enabled;
+        };
+
+        if (clearConsoleBtn) {
+          clearConsoleBtn.addEventListener("click", () => {
+            if (consoleOutput) consoleOutput.textContent = "";
+          });
         }
-      };
-      const setButtonEnabled = (enabled) => {
-        if (!button) return;
-        button.disabled = !enabled;
-      };
 
-      if (clearConsoleBtn) {
-        clearConsoleBtn.addEventListener("click", () => {
-          if (consoleOutput) consoleOutput.textContent = "";
-        });
-      }
+        if (toggleConsoleBtn && consolePane) {
+          // Remove existing listeners to prevent duplicates
+          toggleConsoleBtn.removeEventListener("click", toggleConsoleBtn._toggleHandler);
+          
+          const toggleHandler = () => {
+            const isMinimized = consolePane.classList.contains("minimized");
+            const cmsFrame = document.getElementById("cms-frame");
+            const statusBar = document.getElementById("status-bar");
+            if (isMinimized) {
+              consolePane.classList.remove("minimized");
+              toggleConsoleBtn.textContent = "Hide Console";
+              if (cmsFrame) cmsFrame.style.height = "68vh";
+              if (statusBar) statusBar.style.bottom = "200px";
+            } else {
+              consolePane.classList.add("minimized");
+              toggleConsoleBtn.textContent = "Show Console";
+              if (cmsFrame) cmsFrame.style.height = "78vh";
+              if (statusBar) statusBar.style.bottom = "45px";
+            }
+          };
+          
+          toggleConsoleBtn._toggleHandler = toggleHandler;
+          toggleConsoleBtn.addEventListener("click", toggleHandler);
+        }
 
-      if (toggleConsoleBtn && consolePane) {
-        toggleConsoleBtn.addEventListener("click", () => {
-          const isMinimized = consolePane.classList.contains("minimized");
-          const cmsFrame = document.getElementById("cms-frame");
-          const statusBar = document.getElementById("status-bar");
-          if (isMinimized) {
-            consolePane.classList.remove("minimized");
-            toggleConsoleBtn.textContent = "Hide Console";
-            if (cmsFrame) cmsFrame.style.height = "68vh";
-            if (statusBar) statusBar.style.bottom = "200px";
-          } else {
-            consolePane.classList.add("minimized");
-            toggleConsoleBtn.textContent = "Show Console";
-            if (cmsFrame) cmsFrame.style.height = "78vh";
-            if (statusBar) statusBar.style.bottom = "45px";
+        // Open browser button
+        if (openBrowserBtn && window.electronAPI) {
+          openBrowserBtn.addEventListener("click", () => {
+            window.electronAPI.openExternal("http://localhost:4321").catch(() => {});
+          });
+        }
+
+        // Settings
+        if (settingsBtn) {
+          settingsBtn.addEventListener("click", () => {
+            if (settingsModal) settingsModal.classList.remove("hidden");
+            // Load settings
+            if (autoBuildToggle) autoBuildToggle.checked = localStorage.getItem("autoBuild") === "true";
+            if (consoleFontSize) consoleFontSize.value = localStorage.getItem("consoleFontSize") || "0.85rem";
+          });
+        }
+
+        if (saveSettingsBtn) {
+          saveSettingsBtn.addEventListener("click", () => {
+            localStorage.setItem("autoBuild", autoBuildToggle?.checked ? "true" : "false");
+            localStorage.setItem("consoleFontSize", consoleFontSize?.value || "0.85rem");
+            if (consoleOutput) consoleOutput.style.fontSize = consoleFontSize?.value || "0.85rem";
+            if (settingsModal) settingsModal.classList.add("hidden");
+          });
+        }
+
+        if (closeSettingsBtn) {
+          closeSettingsBtn.addEventListener("click", () => {
+            if (settingsModal) settingsModal.classList.add("hidden");
+          });
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener("keydown", (e) => {
+          if (e.ctrlKey || e.metaKey) {
+            switch (e.key) {
+              case "b":
+              case "B":
+                e.preventDefault();
+                if (button && !button.disabled) button.click();
+                break;
+              case "c":
+              case "C":
+                e.preventDefault();
+                if (toggleConsoleBtn) toggleConsoleBtn.click();
+                break;
+              case "r":
+              case "R":
+                e.preventDefault();
+                // Refresh CMS
+                const cmsFrame = document.getElementById("cms-frame");
+                if (cmsFrame) cmsFrame.src = cmsFrame.src;
+                break;
+            }
           }
         });
-      }
 
-      // Open browser button
-      if (openBrowserBtn && window.electronAPI) {
-        openBrowserBtn.addEventListener("click", () => {
-          window.electronAPI.openExternal("http://localhost:4321").catch(() => {});
+        // Context menu
+        document.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          if (window.electronAPI) {
+            window.electronAPI.showContextMenu().catch((err) => console.error("Context menu error:", err));
+          }
         });
-      }
 
-      // Settings
-      if (settingsBtn) {
-        settingsBtn.addEventListener("click", () => {
-          if (settingsModal) settingsModal.classList.remove("hidden");
-          // Load settings
-          if (autoBuildToggle) autoBuildToggle.checked = localStorage.getItem("autoBuild") === "true";
-          if (consoleFontSize) consoleFontSize.value = localStorage.getItem("consoleFontSize") || "0.85rem";
-        });
-      }
-
-      if (saveSettingsBtn) {
-        saveSettingsBtn.addEventListener("click", () => {
-          localStorage.setItem("autoBuild", autoBuildToggle?.checked ? "true" : "false");
-          localStorage.setItem("consoleFontSize", consoleFontSize?.value || "0.85rem");
-          if (consoleOutput) consoleOutput.style.fontSize = consoleFontSize?.value || "0.85rem";
-          if (settingsModal) settingsModal.classList.add("hidden");
-        });
-      }
-
-      if (closeSettingsBtn) {
-        closeSettingsBtn.addEventListener("click", () => {
-          if (settingsModal) settingsModal.classList.add("hidden");
-        });
-      }
-
-      // Keyboard shortcuts
-      document.addEventListener("keydown", (e) => {
-        if (e.ctrlKey || e.metaKey) {
-          switch (e.key) {
-            case "b":
-            case "B":
-              e.preventDefault();
-              if (button && !button.disabled) button.click();
-              break;
-            case "c":
-            case "C":
-              e.preventDefault();
-              if (toggleConsoleBtn) toggleConsoleBtn.click();
-              break;
-            case "r":
-            case "R":
-              e.preventDefault();
-              // Refresh CMS
+        // Listen for refresh-cms from main
+        if (window.electronAPI) {
+          window.addEventListener("message", (e) => {
+            if (e.data.type === "refresh-cms") {
               const cmsFrame = document.getElementById("cms-frame");
               if (cmsFrame) cmsFrame.src = cmsFrame.src;
-              break;
+            }
+          });
+        }
+
+        // Load settings
+        const savedFontSize = localStorage.getItem("consoleFontSize") || "0.85rem";
+        if (consoleOutput) consoleOutput.style.fontSize = savedFontSize;
+        if (consoleFontSize) consoleFontSize.value = savedFontSize;
+
+        const initElectronReadyProd = () => {
+          if (!button) return false;
+
+          if (!window.electronAPI) {
+            return false;
           }
-        }
-      });
 
-      // Context menu
-      document.addEventListener("contextmenu", (e) => {
-        e.preventDefault();
-        if (window.electronAPI) {
-          window.electronAPI.showContextMenu().catch((err) => console.error("Context menu error:", err));
-        }
-      });
-
-      // Listen for refresh-cms from main
-      if (window.electronAPI) {
-        window.addEventListener("message", (e) => {
-          if (e.data.type === "refresh-cms") {
+          // Refresh CMS listener
+          window.electronAPI.onRefreshCms(() => {
             const cmsFrame = document.getElementById("cms-frame");
             if (cmsFrame) cmsFrame.src = cmsFrame.src;
-          }
-        });
-      }
-
-      // Load settings
-      const savedFontSize = localStorage.getItem("consoleFontSize") || "0.85rem";
-      if (consoleOutput) consoleOutput.style.fontSize = savedFontSize;
-      if (consoleFontSize) consoleFontSize.value = savedFontSize;
-
-      const initElectronReadyProd = () => {
-        if (!button) return false;
-
-        if (!window.electronAPI) {
-          return false;
-        }
-
-        // Set up window controls once
-        if (!window.__windowControlsSetUp) {
-          window.__windowControlsSetUp = true;
-          console.log("Setting up window controls");
-          const minimizeBtn = document.getElementById("minimize-btn");
-          const maximizeBtn = document.getElementById("maximize-btn");
-          const closeBtn = document.getElementById("close-btn");
-          console.log("Buttons found - minimize:", !!minimizeBtn, "maximize:", !!maximizeBtn, "close:", !!closeBtn);
-
-          if (minimizeBtn) {
-            console.log("Adding minimize listener");
-            minimizeBtn.addEventListener("click", () => {
-              console.log("Minimize clicked");
-              window.electronAPI.minimizeWindow().catch((e) => console.error("Minimize error", e));
-            });
-          }
-
-          if (maximizeBtn) {
-            console.log("Adding maximize listener");
-            maximizeBtn.addEventListener("click", () => {
-              console.log("Maximize clicked");
-              window.electronAPI.maximizeWindow().catch((e) => console.error("Maximize error", e));
-            });
-          }
-
-          if (closeBtn) {
-            console.log("Adding close listener");
-            closeBtn.addEventListener("click", () => {
-              console.log("Close clicked");
-              window.electronAPI.closeWindow().catch((e) => console.error("Close error", e));
-            });
-          }
-        }
-
-        // Refresh CMS listener
-        window.electronAPI.onRefreshCms(() => {
-          const cmsFrame = document.getElementById("cms-frame");
-          if (cmsFrame) cmsFrame.src = cmsFrame.src;
-        });
-
-        let buildTimeout = null;
-
-        button.addEventListener("click", () => {
-          setButtonEnabled(false);
-          setToast("Building site...", "busy");
-          setStatus("Building...");
-          appendToConsole("Starting build site...");
-
-          // Fallback: re-enable after 90s if stuck
-          buildTimeout = setTimeout(() => {
-            setButtonEnabled(true);
-            setToast("Build timed out — try again", "failure");
-            setStatus("Build timed out");
-            appendToConsole("Build timed out after 90 seconds.");
-          }, 90000);
-
-          window.electronAPI.runReadyProd().catch(() => {
-            clearTimeout(buildTimeout);
-            setButtonEnabled(true);
-            setToast("Build failed", "failure");
-            setStatus("Build failed");
-            appendToConsole("Build failed.");
           });
-        });
 
-        window.electronAPI.onReadyProdEvent((payload) => {
-          if (!payload) return;
-          if (payload.type === "start" || payload.type === "trigger" || payload.type === "busy") {
-            setToast(payload.message || "Building site...", "busy");
+          let buildTimeout = null;
+
+          button.addEventListener("click", () => {
             setButtonEnabled(false);
+            setToast("Building site...", "busy");
             setStatus("Building...");
-            appendToConsole(payload.message || "Build started.");
-            return;
-          }
-          if (payload.type === "log") {
-            setToast(payload.message, "busy");
-            appendToConsole(payload.message);
-            return;
-          }
-          if (payload.type === "success") {
-            clearTimeout(buildTimeout);
-            setToast(payload.message || "Build complete", "success");
-            setButtonEnabled(true);
-            setStatus("Build complete");
-            appendToConsole(payload.message || "Build completed successfully.");
-            if (window.electronAPI) {
-              window.electronAPI.showNotification("Build Complete", "Your site has been built successfully!").catch(() => {});
+            appendToConsole("Starting build site...");
+
+            // Fallback: re-enable after 90s if stuck
+            buildTimeout = setTimeout(() => {
+              setButtonEnabled(true);
+              setToast("Build timed out — try again", "failure");
+              setStatus("Build timed out");
+              appendToConsole("Build timed out after 90 seconds.");
+            }, 90000);
+
+            window.electronAPI.runReadyProd().catch(() => {
+              clearTimeout(buildTimeout);
+              setButtonEnabled(true);
+              setToast("Build failed", "failure");
+              setStatus("Build failed");
+              appendToConsole("Build failed.");
+            });
+          });
+
+          window.electronAPI.onReadyProdEvent((payload) => {
+            if (!payload) return;
+            if (payload.type === "start" || payload.type === "trigger" || payload.type === "busy") {
+              setToast(payload.message || "Building site...", "busy");
+              setButtonEnabled(false);
+              setStatus("Building...");
+              appendToConsole(payload.message || "Build started.");
+              return;
             }
-            return;
-          }
-          if (payload.type === "failure" || payload.type === "error") {
-            clearTimeout(buildTimeout);
-            setToast(payload.message || "Build failed", "failure");
-            setButtonEnabled(true);
-            setStatus("Build failed");
-            appendToConsole(payload.message || "Build failed.");
-            if (window.electronAPI) {
-              window.electronAPI.showNotification("Build Failed", payload.message || "Build failed").catch(() => {});
+            if (payload.type === "log") {
+              setToast(payload.message, "busy");
+              appendToConsole(payload.message);
+              return;
             }
-            return;
-          }
-        });
+            if (payload.type === "success") {
+              clearTimeout(buildTimeout);
+              setToast(payload.message || "Build complete", "success");
+              setButtonEnabled(true);
+              setStatus("Build complete");
+              appendToConsole(payload.message || "Build completed successfully.");
+              if (window.electronAPI) {
+                window.electronAPI.showNotification("Build Complete", "Your site has been built successfully!").catch(() => {});
+              }
+              return;
+            }
+            if (payload.type === "failure" || payload.type === "error") {
+              clearTimeout(buildTimeout);
+              setToast(payload.message || "Build failed", "failure");
+              setButtonEnabled(true);
+              setStatus("Build failed");
+              appendToConsole(payload.message || "Build failed.");
+              if (window.electronAPI) {
+                window.electronAPI.showNotification("Build Failed", payload.message || "Build failed").catch(() => {});
+              }
+              return;
+            }
+          });
 
-        window.electronAPI.getReadyProdStatus().then((status) => {
-          if (status?.running) {
-            setButtonEnabled(false);
-            setToast("Build in progress", "busy");
-            setStatus("Building...");
-            appendToConsole("Build already in progress on page load.");
-          } else {
-            setStatus("Ready");
-          }
-        });
+          window.electronAPI.getReadyProdStatus().then((status) => {
+            if (status?.running) {
+              setButtonEnabled(false);
+              setToast("Build in progress", "busy");
+              setStatus("Building...");
+              appendToConsole("Build already in progress on page load.");
+            } else {
+              setStatus("Ready");
+            }
+          });
 
-        return true;
-      };
+          return true;
+        };
 
-      const setupElectronIntegration = () => {
-        // Reset the window controls flag so listeners are re-attached on page load
-        window.__windowControlsSetUp = false;
+        // Only setup once globally
+        if (!window.__electronReadyProdSetUp) {
+          window.__electronReadyProdSetUp = true;
 
-        if (initElectronReadyProd()) {
-          appendToConsole("Electron API initialized. Ready for build operations.");
-          return;
-        }
-
-        // Electron API not yet available: retry a few times before giving up.
-        let electronRetries = 0;
-        const electronInterval = setInterval(() => {
-          appendToConsole(`Checking for Electron API... attempt ${electronRetries + 1}`);
           if (initElectronReadyProd()) {
-            clearInterval(electronInterval);
-            appendToConsole("Electron API initialized after retry.");
+            appendToConsole("Electron API initialized. Ready for build operations.");
             return;
           }
 
-          electronRetries += 1;
-          if (electronRetries >= 20) {
-            clearInterval(electronInterval);
-            setButtonEnabled(false);
-            setToast("Build Site works only in Electron mode", "failure");
-            appendToConsole("Electron API not available after 20 attempts. Build site disabled.");
-          }
-        }, 500);
+          // Electron API not yet available: retry a few times before giving up.
+          let electronRetries = 0;
+          const electronInterval = setInterval(() => {
+            appendToConsole(`Checking for Electron API... attempt ${electronRetries + 1}`);
+            if (initElectronReadyProd()) {
+              clearInterval(electronInterval);
+              appendToConsole("Electron API initialized after retry.");
+              return;
+            }
+
+            electronRetries += 1;
+            if (electronRetries >= 20) {
+              clearInterval(electronInterval);
+              setButtonEnabled(false);
+              setToast("Build Site works only in Electron mode", "failure");
+              appendToConsole("Electron API not available after 20 attempts. Build site disabled.");
+            }
+          }, 500);
+        }
       };
 
-      // Setup on initial load
-      if (!window.__electronSetupDone) {
-        setupElectronIntegration();
-        window.__electronSetupDone = true;
-      }
-
-      // Re-setup on page transitions (for Astro view transitions)
-      document.addEventListener("astro:page-load", () => {
-        window.__electronSetupDone = false;
-        setupElectronIntegration();
-      });
+      // Initialize on page load
+      document.addEventListener("astro:page-load", initEditorPage);
+      initEditorPage();
     })();
   </script>
 
@@ -462,61 +420,6 @@ const isDev = import.meta.env.DEV;
     }
     #cms-frame {
       background: var(--background);
-    }
-    #window-title-bar {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 30px;
-      background: #202225;
-      color: #5f97c5;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0 10px;
-      -webkit-app-region: drag;
-      z-index: 10000;
-      font-size: 13px;
-      font-weight: 500;
-      -webkit-user-select: none;
-      user-select: none;
-    }
-    #window-title-bar .title {
-      flex: 1;
-    }
-    #window-title-bar .window-controls {
-      display: flex;
-      gap: 0;
-    }
-    #window-title-bar button {
-      -webkit-app-region: no-drag;
-      background: none;
-      border: none;
-      color: #5f97c5;
-      width: 30px;
-      height: 30px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      font-size: 16px;
-      line-height: 30px;
-      transition: background-color 0.2s;
-      font-weight: normal;
-      pointer-events: auto;
-      -webkit-user-select: none;
-      user-select: none;
-    }
-    #window-title-bar button:hover {
-      background: rgba(95, 151, 197, 0.2);
-    }
-    #close-btn:hover {
-      background: rgba(95, 151, 197, 0.2);
-    }
-    html[data-theme="light"] #window-title-bar {
-      background: #f8f9fa;
-      color: #5f97c5;
     }
     html[data-theme="light"] .console-pane {
       background: rgba(255, 255, 255, 0.95);

@@ -60,6 +60,30 @@
         opacity: 0.95;
       }
 
+      .progress-bar {
+        width: 100%;
+        height: 4px;
+        border: none;
+        background: rgba(124, 173, 255, 0.2);
+        border-radius: 2px;
+        margin-top: 16px;
+        overflow: hidden;
+      }
+
+      .progress-fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #7cadff, #4a90e2);
+        border-radius: 2px;
+        transition: width 0.3s ease;
+      }
+
+      @keyframes progress {
+        0% { width: 0%; }
+        50% { width: 70%; }
+        100% { width: 100%; }
+      }
+
       @keyframes pulse {
         0% {
           transform: scale(0.96);
@@ -81,6 +105,15 @@
       <img src="./logo.png" alt="DeadCodeXO logo" />
       <p>Starting content editor...</p>
       <div class="subtle">Launching Astro + Decap CMS</div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
     </div>
   </body>
+  <script>
+    window.setProgress = function(percent) {
+      const fill = document.getElementById('progress-fill');
+      if (fill) fill.style.width = percent + '%';
+    };
+  </script>
 </html>

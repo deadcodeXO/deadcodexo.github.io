@@ -70,15 +70,6 @@ git commit -m "Update site"
 git push
 ```
 
-## OG Image Generation
-
-- Per-post social cards: `src/pages/posts/[...slug]/index.png.ts`
-- Site fallback OG image: `src/pages/og.png.ts`
-- Templates:
-  - `src/utils/og-templates/post.js`
-  - `src/utils/og-templates/site.js`
-- Toggle in `src/config.ts` with `dynamicOgImage`.
-
 ## Configuration
 
 Main site options live in `src/config.ts`:
@@ -88,8 +79,4 @@ Main site options live in `src/config.ts`:
 - pagination
 - feature toggles (projects, archives, galleries, etc.)
 
-## Backup Recommendation
-
-Primary backup: git remote(s).  
-Secondary backup: zip/rar of repo (exclude `node_modules`, `.astro`, `dist`).
 

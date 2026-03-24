@@ -30,7 +30,6 @@
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.1.18",
     "astro": "^6.0.8",
-    "concurrently": "^9.2.1",
     "dayjs": "^1.11.19",
     "decap-server": "^3.5.2",
     "lodash.kebabcase": "^4.1.1",
@@ -46,6 +45,8 @@
     "@pagefind/default-ui": "^1.4.0",
     "@types/lodash.kebabcase": "^4.1.9",
     "@typescript-eslint/parser": "^8.57.0",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
     "electron": "^41.0.3",
     "electron-builder": "^26.8.1",
     "eslint": "^10.0.0",
@@ -56,11 +57,13 @@
     "prettier-plugin-astro": "^0.14.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.57.0"
+    "typescript-eslint": "^8.57.0",
+    "wait-on": "^9.0.4"
   },
   "build": {
     "appId": "net.functionabuse.deadcodexo.cms",
-    "productName": "DeadCodeXO CMS",
+    "productName": "DCs Content Editor",
+    "icon": "electron/icon.png",
     "asar": true,
     "files": [
       "**/*",

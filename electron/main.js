@@ -9,11 +9,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const bundledProjectRoot = path.resolve(__dirname, "..");
 
-const DEV_SERVER_PORT = 4321;
-const DEV_SERVER_HOST = "127.0.0.1";
-const DEV_SERVER_URL = `http://${DEV_SERVER_HOST}:${DEV_SERVER_PORT}`;
-const DEFAULT_DECAP_PORT = 8081;
-const MAX_DECAP_PORT = 8199;
+// ======= Electron + CMS Server Constants =======
+const DEV_SERVER_HOST = "127.0.0.1";        // Astro dev server host
+const DEV_SERVER_PORT = 4321;               // Astro dev server port
+const DEV_SERVER_URL = `http://${DEV_SERVER_HOST}:${DEV_SERVER_PORT}`; // Astro URL
+
+const DEFAULT_DECAP_PORT = 8081;            // Default Decap CMS proxy port
+const DECAP_PROXY_PORT = 8081;              // Decap CMS proxy port
+const DECAP_PROXY_URL = `http://${DEV_SERVER_HOST}:${DECAP_PROXY_PORT}`; // Decap editor URL
+
+const MAX_DECAP_PORT = 8199;                // Optional upper bound if auto-incrementing ports
 
 let mainWindow = null;
 let splashWindow = null;
@@ -102,6 +107,11 @@ function createSplashWindow() {
   });
 
   splashWindow.loadFile(path.join(__dirname, "splash.html"));
+  try {
+    splashWindow.webContents.executeJavaScript('setProgress(10)');
+  } catch (error) {
+    appendStartupLog(`Splash progress init error: ${error.message}`);
+  }
 }
 
 function createMainWindow() {
@@ -115,9 +125,8 @@ function createMainWindow() {
     backgroundColor: "#10131a",
   });
 
-  mainWindow.loadURL(
-    `${DEV_SERVER_URL}/editor/?cms_proxy_port=${encodeURIComponent(String(decapServerPort))}`
-  );
+  appendStartupLog(`Loading main window URL: ${DEV_SERVER_URL}/editor`);
+  mainWindow.loadURL(`${DEV_SERVER_URL}/editor`);
 
   let revealed = false;
   const revealWindow = () => {
@@ -281,24 +290,29 @@ async function waitForCmsServer(earlyExitPromise) {
     const timeoutMs = 120000;
     const intervalMs = 300;
     const deadline = Date.now() + timeoutMs;
+    let ready = false;
 
     while (Date.now() < deadline) {
       try {
-        const response = await fetch(DEV_SERVER_URL, {
-          method: "GET",
-          cache: "no-store",
-        });
+        const response = await fetch(`${DEV_SERVER_URL}/editor`, { method: "GET", cache: "no-store" });
+        appendStartupLog(`[decap] probe response: ${response.status}`);
         if (response.ok) {
-          appendStartupLog(`[astro] readiness probe OK (${response.status})`);
-          return;
+          appendStartupLog(`[decap] CMS ready (${response.status})`);
+          try {
+            splashWindow.webContents.executeJavaScript('setProgress(100)');
+          } catch (error) {
+            appendStartupLog(`Splash progress 100 error: ${error.message}`);
+          }
+          ready = true;
+          break;
         }
-      } catch {
-        // Ignore probe errors while Astro is still booting.
+      } catch (error) {
+        appendStartupLog(`[decap] probe error: ${error.message}`);
+        await new Promise((r) => setTimeout(r, 300));
       }
-
-      await new Promise(resolve => setTimeout(resolve, intervalMs));
     }
 
+    if (ready) return;
     throw new Error(`Timed out waiting for ${DEV_SERVER_URL} to be reachable.`);
   })();
 
@@ -335,9 +349,19 @@ app.whenReady().then(async () => {
     appendStartupLog(
       `PORTABLE_EXECUTABLE_DIR: ${process.env.PORTABLE_EXECUTABLE_DIR ?? "(not set)"}`
     );
+    try {
+      splashWindow.webContents.executeJavaScript('setProgress(20)');
+    } catch (error) {
+      appendStartupLog(`Splash progress 20 error: ${error.message}`);
+    }
     createSplashWindow();
 
-    const earlyExitPromise = await startCmsServer();
+    const earlyExitPromise = startCmsServer();
+    try {
+      splashWindow.webContents.executeJavaScript('setProgress(50)');
+    } catch (error) {
+      appendStartupLog(`Splash progress 50 error: ${error.message}`);
+    }
     await waitForCmsServer(earlyExitPromise);
     createMainWindow();
   } catch (error) {

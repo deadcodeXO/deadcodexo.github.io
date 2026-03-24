@@ -1,6 +1,6 @@
-import { app, BrowserWindow, dialog } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
 import { spawn } from "node:child_process";
-import { createWriteStream, existsSync } from "node:fs";
+import { createWriteStream, existsSync, watch } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,6 +29,11 @@ let workspaceRoot = bundledProjectRoot;
 let decapServerPort = DEFAULT_DECAP_PORT;
 const startupLogTail = [];
 
+let readyProdRunning = false;
+let readyProdLastStatus = "idle";
+let readyProdWatchTimer = null;
+
+
 function stripAnsi(value) {
   return value.replace(/\u001b\[[0-9;]*m/g, "");
 }
@@ -49,6 +54,106 @@ function initStartupLog() {
   startupLogStream = createWriteStream(startupLogPath, { flags: "a" });
   appendStartupLog("----- CMS app launch -----");
 }
+
+function sendReadyProdEvent(payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("readyprod-event", payload);
+  }
+}
+
+function runReadyProdProcess() {
+  if (readyProdRunning) {
+    sendReadyProdEvent({ type: "busy", message: "readyprod is already running" });
+    return Promise.resolve({ status: "busy" });
+  }
+
+  readyProdRunning = true;
+  readyProdLastStatus = "running";
+  sendReadyProdEvent({ type: "start", message: "readyprod started" });
+  appendStartupLog("Starting npm run readyprod...");
+
+  return new Promise((resolve) => {
+    const isWin = process.platform === "win32";
+    const proc = spawn(isWin ? "npm" : "npm", ["run", "readyprod"], {
+      cwd: workspaceRoot,
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: isWin,
+      env: {
+        ...process.env,
+      },
+    });
+
+    proc.stdout?.on("data", chunk => {
+      const text = stripAnsi(String(chunk)).trim();
+      if (text) {
+        appendStartupLog(`[readyprod] ${text}`);
+        sendReadyProdEvent({ type: "log", message: text });
+      }
+    });
+
+    proc.stderr?.on("data", chunk => {
+      const text = stripAnsi(String(chunk)).trim();
+      if (text) {
+        appendStartupLog(`[readyprod:error] ${text}`);
+        sendReadyProdEvent({ type: "log", message: text });
+      }
+    });
+
+    proc.on("error", (error) => {
+      appendStartupLog(`[readyprod:error] ${error.message}`);
+      sendReadyProdEvent({ type: "error", message: error.message });
+    });
+
+    proc.on("close", (code) => {
+      readyProdRunning = false;
+      readyProdLastStatus = code === 0 ? "success" : "failed";
+      if (code === 0) {
+        appendStartupLog("readyprod completed successfully.");
+        sendReadyProdEvent({ type: "success", message: "readyprod finished successfully" });
+        resolve({ status: "success" });
+      } else {
+        appendStartupLog(`readyprod failed with code ${code}.`);
+        sendReadyProdEvent({ type: "failure", message: `readyprod failed (code ${code})` });
+        resolve({ status: "failed", code });
+      }
+    });
+  });
+}
+
+function setupReadyProdWatcher() {
+  const watchPaths = [
+    path.join(workspaceRoot, "src", "data", "blog"),
+    path.join(workspaceRoot, "src", "data", "galleries"),
+    path.join(workspaceRoot, "src", "data", "pages"),
+  ];
+
+  for (const watchPath of watchPaths) {
+    if (!existsSync(watchPath)) continue;
+
+    try {
+      watch(watchPath, { recursive: true }, (_, filename) => {
+        if (!filename) return;
+
+        if (readyProdWatchTimer) clearTimeout(readyProdWatchTimer);
+
+        readyProdWatchTimer = setTimeout(() => {
+          sendReadyProdEvent({ type: "trigger", message: "Content changed, running readyprod" });
+          runReadyProdProcess().catch(() => {});
+        }, 2200);
+      });
+    } catch (error) {
+      appendStartupLog(`readyprod watcher error for ${watchPath}: ${error.message}`);
+    }
+  }
+}
+
+ipcMain.handle("run-readyprod", async () => runReadyProdProcess());
+
+ipcMain.handle("get-readyprod-status", () => ({
+  running: readyProdRunning,
+  status: readyProdLastStatus,
+}));
 
 function isWorkspaceRoot(candidatePath) {
   return (
@@ -123,8 +228,15 @@ function createMainWindow() {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: "#10131a",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      worldSafeExecuteJavaScript: true,
+    },
   });
 
+  appendStartupLog(`Preload path: ${path.join(__dirname, "preload.js")}`);
   appendStartupLog(`Loading main window URL: ${DEV_SERVER_URL}/editor`);
   mainWindow.loadURL(`${DEV_SERVER_URL}/editor`);
 
@@ -160,6 +272,30 @@ function createMainWindow() {
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
+}
+
+function createAppMenu() {
+  const template = [
+    {
+      label: "File",
+      submenu: [
+        {
+          label: "Run readyprod",
+          accelerator: "CmdOrCtrl+R",
+          click: () => {
+            runReadyProdProcess().catch(() => {});
+          },
+        },
+        { type: "separator" },
+        { role: "quit" },
+      ],
+    },
+    {
+      label: "View",
+      submenu: [{ role: "reload" }, { role: "toggledevtools" }, { role: "togglefullscreen" }],
+    },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
 function spawnNodeProcess(label, scriptPath, args = [], extraEnv = {}) {
@@ -364,6 +500,8 @@ app.whenReady().then(async () => {
     }
     await waitForCmsServer(earlyExitPromise);
     createMainWindow();
+    createAppMenu();
+    setupReadyProdWatcher();
   } catch (error) {
     if (splashWindow && !splashWindow.isDestroyed()) {
       splashWindow.close();

@@ -3,7 +3,7 @@ title: DigitalChaos Misskey Instance
 description: Hosted and federated Misskey instance
 pubDatetime: 2026-03-19T03:10:15.000Z
 author: DEADCODEXO
-featured: true
+featured: false
 draft: false
 tags:
   - Misskey

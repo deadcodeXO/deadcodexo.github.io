@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell, Notification } from "electron";
 import { spawn } from "node:child_process";
 import { createWriteStream, existsSync, watch } from "node:fs";
 import net from "node:net";
@@ -155,6 +155,75 @@ ipcMain.handle("get-readyprod-status", () => ({
   status: readyProdLastStatus,
 }));
 
+ipcMain.handle("minimize-window", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.minimize();
+  }
+});
+
+ipcMain.handle("maximize-window", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+});
+
+ipcMain.handle("close-window", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.close();
+  }
+});
+
+ipcMain.handle("open-external", async (_, url) => {
+  await shell.openExternal(url);
+});
+
+ipcMain.handle("show-notification", async (_, title, body) => {
+  try {
+    const notification = new Notification({
+      title,
+      body,
+      silent: false,
+    });
+    // Keep reference to prevent garbage collection
+    if (!global.notifications) global.notifications = [];
+    global.notifications.push(notification);
+    // Clean up old notifications
+    if (global.notifications.length > 10) {
+      global.notifications.shift();
+    }
+  } catch (error) {
+    console.error("Notification error:", error);
+  }
+});
+
+ipcMain.handle("show-context-menu", () => {
+  const template = [
+    {
+      label: "Refresh CMS",
+      click: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send("refresh-cms");
+        }
+      },
+    },
+    { type: "separator" },
+    {
+      label: "Dev Tools",
+      click: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.openDevTools();
+        }
+      },
+    },
+  ];
+  const menu = Menu.buildFromTemplate(template);
+  menu.popup({ window: mainWindow });
+});
+
 function isWorkspaceRoot(candidatePath) {
   return (
     existsSync(path.join(candidatePath, "package.json")) &&
@@ -225,6 +294,7 @@ function createMainWindow() {
     height: 1080,
     minWidth: 1024,
     minHeight: 700,
+    frame: false,
     show: false,
     autoHideMenuBar: true,
     backgroundColor: "#10131a",

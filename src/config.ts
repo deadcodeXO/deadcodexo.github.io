@@ -4,7 +4,7 @@ export const SITE = {
   profile: "https://github.com/deadcodexo",
   desc: "just a below average ghost trapped inside a PC",
   title: "DEADCODEXO",
-  ogImage: "",
+  ogImage: "/og.png",
   lightAndDarkMode: true,
   postPerIndex: 6,
   postPerPage: 8,
@@ -13,6 +13,9 @@ export const SITE = {
   showArchives: true,
   showGalleries: true,
   showBackButton: true,
+  devToolbar: {
+    enabled: false
+  },
   editPost: {
     enabled: false,
     text: "Edit this post",

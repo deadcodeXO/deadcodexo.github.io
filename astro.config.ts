@@ -15,6 +15,7 @@ import { SITE } from "./src/config";
 // https://astro.build/config
 export default defineConfig({
   site: SITE.website,
+  devtools: { enabled: false },
   integrations: [
     mdx({
       extendMarkdownConfig: true,

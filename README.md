@@ -1,4 +1,4 @@
-# DEADCODEXO Site
+# deacodes Astro site for GH pages
 
 Personal Astro site for GitHub Pages, with local-first content editing via Decap CMS.
 
@@ -11,6 +11,7 @@ Live site: `https://chaos.functionabuse.net/`
 - TypeScript
 - Decap CMS + `decap-server` (local editor workflow)
 - Pagefind (search index generation)
+- Electron (portable CMS app)
 
 ## Local Development
 
@@ -37,6 +38,24 @@ Then use:
 - `/editor` for the themed editor page
 - `/admin` for the Decap CMS app
 
+### Portable CMS App
+
+For a standalone, no-install CMS editor:
+
+```bash
+npm run cms:app:portable
+```
+
+This creates `release/DeadCodeXO CMS 1.0.0.exe` - a portable Windows executable you can run from anywhere (as long as it's in a folder whose parent contains the repo). It bundles the full CMS environment for quick content editing.
+
+After editing, commit and push your changes:
+
+```bash
+git add .
+git commit -m "Update content"
+git push
+```
+
 ## Content Model
 
 - Posts: `src/data/blog/*.md`
@@ -47,6 +66,9 @@ Then use:
 
 - `npm run dev` - Astro dev server
 - `npm run dev:cms` - Astro + local Decap backend
+- `npm run cms:app` - Electron CMS app (dev mode)
+- `npm run cms:app:portable` - Build portable Windows exe
+- `npm run cms:app:installer` - Build Windows installer
 - `npm run build` - typecheck + build + remove dev-only routes + pagefind index
 - `npm run syncdocs` - sync `dist/` to `docs/` (restores `CNAME`, writes `.nojekyll`)
 - `npm run readyprod` - `build` + `syncdocs`
@@ -61,6 +83,7 @@ Then use:
   - `/edit`
   - `/admin`
 - GitHub Pages output is served from `docs/`.
+- The portable CMS exe (`release/DeadCodeXO CMS 1.0.0.exe`) can be used for content editing without running the full dev environment.
 - Deploy flow:
 
 ```bash

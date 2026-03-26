@@ -20,6 +20,11 @@ const MAX_DECAP_PORT = 8199;                // Optional upper bound if auto-incr
 
 let mainWindow = null;
 let splashWindow = null;
+let splashWindowReady = false;
+let splashFlushScheduled = false;
+let pendingSplashProgress = 0;
+let pendingSplashTitle = "Starting content editor...";
+let pendingSplashDetail = "Launching Astro + Decap CMS";
 let cmsServerProcesses = [];
 let startupLogPath = "";
 let startupLogStream = null;
@@ -58,21 +63,48 @@ function sendReadyProdEvent(payload) {
   }
 }
 
-function setSplashProgress(percent) {
-  if (!splashWindow || splashWindow.isDestroyed()) return;
+function flushSplashState() {
+  if (!splashWindow || splashWindow.isDestroyed() || !splashWindowReady) return;
+
+  const progress = Number.isFinite(pendingSplashProgress)
+    ? String(Math.max(0, Math.min(100, pendingSplashProgress)))
+    : "0";
+  const safeTitle = JSON.stringify(pendingSplashTitle ?? "");
+  const safeDetail = JSON.stringify(pendingSplashDetail ?? "");
+
   splashWindow.webContents
-    .executeJavaScript(`window.setProgress?.(${String(percent)})`)
-    .catch(error => appendStartupLog(`Splash progress ${String(percent)} error: ${error.message}`));
+    .executeJavaScript(
+      `window.setProgress?.(${progress}); window.setSplashStatus?.(${safeTitle}, ${safeDetail});`
+    )
+    .catch(error => appendStartupLog(`Splash state update error: ${error.message}`));
+}
+
+function queueSplashFlush() {
+  if (!splashWindow || splashWindow.isDestroyed() || !splashWindowReady) return;
+  if (splashFlushScheduled) return;
+
+  splashFlushScheduled = true;
+  queueMicrotask(() => {
+    splashFlushScheduled = false;
+    flushSplashState();
+  });
+}
+
+function setSplashProgress(percent) {
+  pendingSplashProgress = Number.isFinite(percent)
+    ? Math.max(0, Math.min(100, Math.round(percent)))
+    : pendingSplashProgress;
+  queueSplashFlush();
 }
 
 function setSplashStatus(title, detail = "") {
-  if (!splashWindow || splashWindow.isDestroyed()) return;
-
-  const safeTitle = JSON.stringify(title ?? "");
-  const safeDetail = JSON.stringify(detail ?? "");
-  splashWindow.webContents
-    .executeJavaScript(`window.setSplashStatus?.(${safeTitle}, ${safeDetail})`)
-    .catch(error => appendStartupLog(`Splash status update error: ${error.message}`));
+  pendingSplashTitle = typeof title === "string" && title.length
+    ? title
+    : pendingSplashTitle;
+  pendingSplashDetail = typeof detail === "string" && detail.length
+    ? detail
+    : pendingSplashDetail;
+  queueSplashFlush();
 }
 
 function runReadyProdProcess() {
@@ -262,6 +294,8 @@ function resolveWorkspaceRoot() {
 }
 
 function createSplashWindow() {
+  splashWindowReady = false;
+  splashFlushScheduled = false;
   splashWindow = new BrowserWindow({
     width: 430,
     height: 320,
@@ -274,6 +308,13 @@ function createSplashWindow() {
   });
 
   splashWindow.loadFile(path.join(__dirname, "splash.html"));
+  splashWindow.webContents.once("did-finish-load", () => {
+    splashWindowReady = true;
+    flushSplashState();
+  });
+  splashWindow.on("closed", () => {
+    splashWindowReady = false;
+  });
   setSplashProgress(10);
   setSplashStatus("Starting content editor...", "Preparing launcher");
 }

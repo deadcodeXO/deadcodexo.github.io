@@ -131,6 +131,7 @@
         height: 100%;
         min-width: 0;
         min-height: 0;
+        overflow: hidden;
       }
 
       .workspace-header {
@@ -200,6 +201,290 @@
         color: var(--muted);
       }
 
+      .workspace-main {
+        display: grid;
+        grid-template-columns: var(--code-pane-width, 470px) 8px minmax(0, 1fr);
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .code-pane {
+        min-width: 0;
+        border-right: 1px solid var(--border);
+        background: rgba(20, 24, 35, 0.82);
+        display: grid;
+        grid-template-rows: 34px minmax(0, 1fr) 26px;
+        overflow: hidden;
+      }
+
+      .code-pane-head {
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 8px 0 10px;
+        background: rgba(16, 20, 30, 0.9);
+      }
+
+      .code-pane-title {
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #a9bce4;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+
+      .code-pane-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .code-pane-btn {
+        width: 22px;
+        height: 22px;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        background: transparent;
+        color: #9cb2de;
+        padding: 0;
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+      }
+
+      .code-pane-btn:hover {
+        border-color: var(--border);
+        background: rgba(140, 169, 230, 0.16);
+        color: #d8e5ff;
+      }
+
+      .code-pane-btn svg {
+        width: 13px;
+        height: 13px;
+        stroke: currentColor;
+        stroke-width: 2;
+        fill: none;
+      }
+
+      .code-pane-body {
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 230px minmax(0, 1fr);
+      }
+
+      .file-pane {
+        min-width: 0;
+        min-height: 0;
+        border-right: 1px solid var(--border);
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        background: rgba(15, 19, 28, 0.7);
+        overflow: hidden;
+      }
+
+      .file-filter-wrap {
+        padding: 8px 8px 6px;
+      }
+
+      .file-filter {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: rgba(18, 24, 36, 0.82);
+        color: var(--text);
+        font-size: 12px;
+        padding: 7px 9px;
+        outline: none;
+      }
+
+      .file-filter:focus {
+        border-color: rgba(112, 165, 255, 0.86);
+        box-shadow: 0 0 0 2px rgba(102, 162, 255, 0.22);
+      }
+
+      .file-list {
+        height: 100%;
+        min-height: 0;
+        overflow-y: scroll;
+        overflow-x: hidden;
+        scrollbar-gutter: stable both-edges;
+        padding: 4px 4px 8px 6px;
+        scrollbar-width: auto;
+        scrollbar-color: rgba(120, 152, 214, 0.55) transparent;
+      }
+
+      .file-list::-webkit-scrollbar {
+        width: 12px;
+      }
+
+      .file-list::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .file-list::-webkit-scrollbar-thumb {
+        background: linear-gradient(
+          180deg,
+          rgba(116, 154, 232, 0.7),
+          rgba(91, 131, 214, 0.55)
+        );
+        border: 3px solid transparent;
+        border-radius: 10px;
+        background-clip: padding-box;
+      }
+
+      .file-item {
+        width: 100%;
+        border: 1px solid transparent;
+        border-radius: 7px;
+        background: transparent;
+        color: #b7c7ea;
+        text-align: left;
+        font-size: 12px;
+        line-height: 1.35;
+        padding: 6px 8px;
+        margin-bottom: 2px;
+        cursor: pointer;
+      }
+
+      .file-item.dir {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-weight: 600;
+      }
+
+      .file-tree-toggle {
+        width: 10px;
+        flex: 0 0 10px;
+        color: #a5b9e2;
+        font-size: 11px;
+      }
+
+      .file-tree-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .file-item:hover {
+        border-color: rgba(130, 168, 244, 0.5);
+        background: rgba(108, 150, 236, 0.13);
+        color: #e0ebff;
+      }
+
+      .file-item.active {
+        border-color: rgba(117, 167, 255, 0.85);
+        background: rgba(102, 162, 255, 0.2);
+        color: #f0f5ff;
+      }
+
+      .file-item.dirty::before {
+        content: "* ";
+        color: #f9be69;
+      }
+
+      .file-empty {
+        font-size: 12px;
+        color: var(--muted);
+        padding: 8px;
+      }
+
+      .code-view {
+        min-width: 0;
+        min-height: 0;
+        position: relative;
+        display: grid;
+        grid-template-rows: 30px minmax(0, 1fr);
+      }
+
+      .code-view-head {
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 10px;
+        font-size: 12px;
+        color: #afc2ea;
+        background: rgba(15, 19, 28, 0.82);
+      }
+
+      .code-file-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .monaco-host {
+        position: relative;
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .plain-editor {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border: none;
+        outline: none;
+        resize: none;
+        background: #0f1420;
+        color: #dbe6ff;
+        padding: 12px;
+        font-family: Consolas, "Cascadia Code", monospace;
+        font-size: 13px;
+        line-height: 1.45;
+        tab-size: 2;
+      }
+
+      .plain-editor.hidden {
+        display: none;
+      }
+
+      .editor-empty {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        color: var(--muted);
+        font-size: 12px;
+        padding: 18px;
+        text-align: center;
+        pointer-events: none;
+        z-index: 2;
+      }
+
+      .editor-empty.hidden {
+        display: none;
+      }
+
+      .code-pane-foot {
+        border-top: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 0 10px;
+        font-size: 11px;
+        color: var(--muted);
+        background: rgba(15, 19, 28, 0.82);
+      }
+
+      .workspace-resizer {
+        cursor: col-resize;
+        background: rgba(72, 103, 163, 0.3);
+        transition: background 0.12s ease;
+      }
+
+      .workspace-resizer:hover,
+      .workspace-resizer.dragging {
+        background: rgba(102, 162, 255, 0.62);
+      }
+
       .editor-frame {
         width: 100%;
         height: 100%;
@@ -222,6 +507,65 @@
 
       body[data-theme="light"] .workspace-header {
         background: rgba(238, 244, 255, 0.88);
+      }
+
+      body[data-theme="light"] .workspace-main {
+        background: rgba(245, 249, 255, 0.75);
+      }
+
+      body[data-theme="light"] .code-pane {
+        background: rgba(243, 248, 255, 0.94);
+      }
+
+      body[data-theme="light"] .code-pane-head,
+      body[data-theme="light"] .code-view-head,
+      body[data-theme="light"] .code-pane-foot {
+        background: rgba(235, 242, 255, 0.94);
+      }
+
+      body[data-theme="light"] .file-pane {
+        background: rgba(238, 244, 255, 0.88);
+      }
+
+      body[data-theme="light"] .file-filter {
+        background: rgba(248, 251, 255, 0.98);
+        color: #1f2a3f;
+      }
+
+      body[data-theme="light"] .file-list {
+        scrollbar-color: rgba(136, 154, 186, 0.72) transparent;
+      }
+
+      body[data-theme="light"] .file-list::-webkit-scrollbar-thumb {
+        background: linear-gradient(
+          180deg,
+          rgba(198, 209, 228, 0.95),
+          rgba(172, 186, 211, 0.9)
+        );
+        background-clip: padding-box;
+      }
+
+      body[data-theme="light"] .file-item {
+        color: #345079;
+      }
+
+      body[data-theme="light"] .file-item:hover {
+        color: #1c365c;
+        background: rgba(167, 189, 224, 0.34);
+      }
+
+      body[data-theme="light"] .file-item.active {
+        color: #1b365a;
+        background: rgba(145, 176, 224, 0.42);
+      }
+
+      body[data-theme="light"] .file-tree-toggle {
+        color: #6f86b1;
+      }
+
+      body[data-theme="light"] .plain-editor {
+        background: #f7faff;
+        color: #1b2d4a;
       }
 
       body[data-theme="light"] .console {
@@ -255,6 +599,8 @@
         height: 170px;
         display: grid;
         grid-template-rows: 34px 1fr;
+        position: relative;
+        z-index: 5;
       }
 
       .console.minimized {
@@ -420,7 +766,65 @@
           </div>
           <span class="build-status" id="build-status">Ready</span>
         </div>
-        <iframe id="editor-frame" class="editor-frame" title="Editor"></iframe>
+        <div class="workspace-main" id="workspace-main">
+          <section class="code-pane" id="code-pane">
+            <div class="code-pane-head">
+              <span class="code-pane-title" id="repo-label">Repository</span>
+              <div class="code-pane-actions">
+                <button class="code-pane-btn" id="refresh-files-btn" type="button" aria-label="Refresh file list" title="Refresh files">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 12a9 9 0 0 1 15.5-6.4L21 8"></path>
+                    <path d="M21 3v5h-5"></path>
+                    <path d="M21 12a9 9 0 0 1-15.5 6.4L3 16"></path>
+                    <path d="M3 21v-5h5"></path>
+                  </svg>
+                </button>
+                <button class="code-pane-btn" id="save-file-btn" type="button" aria-label="Save current file" title="Save file">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="code-pane-body">
+              <aside class="file-pane">
+                <div class="file-filter-wrap">
+                  <input
+                    id="file-filter-input"
+                    class="file-filter"
+                    type="text"
+                    placeholder="Filter files..."
+                    autocomplete="off"
+                  />
+                </div>
+                <div class="file-list" id="file-list"></div>
+              </aside>
+              <section class="code-view">
+                <div class="code-view-head">
+                  <span class="code-file-name" id="current-file-label">No file selected</span>
+                </div>
+                <div class="monaco-host" id="monaco-host">
+                  <div class="editor-empty" id="editor-empty">
+                    Select a file to edit. Your changes stay local to this repository.
+                  </div>
+                  <textarea
+                    id="plain-editor"
+                    class="plain-editor hidden"
+                    spellcheck="false"
+                    aria-label="Fallback code editor"
+                  ></textarea>
+                </div>
+              </section>
+            </div>
+            <div class="code-pane-foot">
+              <span id="editor-status">Editor ready</span>
+            </div>
+          </section>
+          <div class="workspace-resizer" id="workspace-resizer" aria-hidden="true"></div>
+          <iframe id="editor-frame" class="editor-frame" title="Editor"></iframe>
+        </div>
         <section class="console" id="console">
           <div class="console-head">
             <strong>Activity</strong>
@@ -433,397 +837,7 @@
       </section>
     </main>
 
-    <script>
-      (() => {
-        const params = new URLSearchParams(window.location.search);
-        const editorUrl =
-          params.get("editorUrl") || "http://127.0.0.1:4321/editor";
-        const siteUrl = params.get("siteUrl") || "http://127.0.0.1:4321";
-
-        const api = window.electronAPI;
-        const frame = document.getElementById("editor-frame");
-        const buildBtn = document.getElementById("build-btn");
-        const buildStatus = document.getElementById("build-status");
-        const consoleBody = document.getElementById("console-body");
-        const consoleEl = document.getElementById("console");
-        const statusDot = document.getElementById("status-dot");
-        const editorOrigin = (() => {
-          try {
-            return new URL(editorUrl).origin;
-          } catch {
-            return null;
-          }
-        })();
-        const siteOrigin = (() => {
-          try {
-            return new URL(siteUrl).origin;
-          } catch {
-            return null;
-          }
-        })();
-        const messageOrigin = editorOrigin ?? siteOrigin ?? "*";
-        let frameThemeObserver = null;
-        let observedThemeDocument = null;
-        let frameUiObserver = null;
-        let observedUiDocument = null;
-        const FRAME_HIDE_STYLE_ID = "dcx-hide-astro-dev-toolbar";
-        const FRAME_HIDE_CSS = `
-          astro-dev-toolbar,
-          astro-dev-toolbar-window,
-          astro-dev-toolbar-app,
-          [data-astro-dev-toolbar],
-          [id*="astro-dev-toolbar"] {
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            pointer-events: none !important;
-          }
-        `;
-
-        if (frame) frame.src = editorUrl;
-
-        const log = message => {
-          if (!consoleBody) return;
-          const stamp = new Date().toLocaleTimeString();
-          consoleBody.textContent += `[${stamp}] ${message}\n`;
-          consoleBody.scrollTop = consoleBody.scrollHeight;
-        };
-
-        const setBusy = busy => {
-          if (buildBtn) buildBtn.classList.toggle("busy", busy);
-          if (statusDot) {
-            statusDot.style.background = busy ? "#66a2ff" : "#4bc37a";
-            statusDot.style.boxShadow = busy
-              ? "0 0 0 3px rgba(102, 162, 255, 0.2)"
-              : "0 0 0 3px rgba(75, 195, 122, 0.2)";
-          }
-        };
-
-        const setStatus = text => {
-          if (buildStatus) buildStatus.textContent = text;
-        };
-
-        const reloadFrame = () => {
-          if (!frame) return;
-          frame.src = editorUrl;
-          log("Editor refreshed.");
-        };
-
-        const applyShellTheme = theme => {
-          const normalizedTheme = theme === "light" ? "light" : "dark";
-          document.body.setAttribute("data-theme", normalizedTheme);
-        };
-
-        const requestThemeFromEditor = () => {
-          if (!frame || !frame.contentWindow) return;
-          frame.contentWindow.postMessage(
-            { type: "companion-request-theme" },
-            messageOrigin
-          );
-        };
-
-        const readThemeFromFrame = () => {
-          if (!frame) return null;
-          try {
-            const doc = frame.contentDocument;
-            const themeAttr = doc?.documentElement?.getAttribute("data-theme");
-            if (themeAttr === "light" || themeAttr === "dark") return themeAttr;
-            const stored = frame.contentWindow?.localStorage?.getItem("theme");
-            if (stored === "light" || stored === "dark") return stored;
-          } catch {
-            return null;
-          }
-          return null;
-        };
-
-        const syncThemeFromFrame = () => {
-          const frameTheme = readThemeFromFrame();
-          if (!frameTheme) return;
-          applyShellTheme(frameTheme);
-        };
-
-        const bindFrameThemeObserver = () => {
-          if (!frame) return;
-          let frameDoc = null;
-          try {
-            frameDoc = frame.contentDocument;
-          } catch {
-            return;
-          }
-          if (!frameDoc || frameDoc === observedThemeDocument) return;
-          observedThemeDocument = frameDoc;
-
-          if (frameThemeObserver) {
-            frameThemeObserver.disconnect();
-            frameThemeObserver = null;
-          }
-
-          const root = frameDoc.documentElement;
-          if (!root) return;
-
-          frameThemeObserver = new MutationObserver(() => {
-            syncThemeFromFrame();
-          });
-
-          frameThemeObserver.observe(root, {
-            attributes: true,
-            attributeFilter: ["data-theme"],
-          });
-          syncThemeFromFrame();
-        };
-
-        const hideAstroDevToolbarInDocument = doc => {
-          if (!doc) return;
-          const root = doc.documentElement;
-          if (!root) return;
-
-          let styleEl = doc.getElementById(FRAME_HIDE_STYLE_ID);
-          if (!styleEl) {
-            styleEl = doc.createElement("style");
-            styleEl.id = FRAME_HIDE_STYLE_ID;
-            styleEl.textContent = FRAME_HIDE_CSS;
-            (doc.head || root).appendChild(styleEl);
-          }
-
-          doc
-            .querySelectorAll(
-              "astro-dev-toolbar, astro-dev-toolbar-window, astro-dev-toolbar-app, [data-astro-dev-toolbar], [id*='astro-dev-toolbar']"
-            )
-            .forEach(node => {
-              node.style.display = "none";
-            });
-        };
-
-        const hideAstroDevToolbarInFrameTree = () => {
-          if (!frame) return;
-          try {
-            const topDoc = frame.contentDocument;
-            if (!topDoc) return;
-            hideAstroDevToolbarInDocument(topDoc);
-            topDoc.querySelectorAll("iframe").forEach(innerFrame => {
-              try {
-                hideAstroDevToolbarInDocument(innerFrame.contentDocument);
-              } catch {
-                // Ignore cross-origin iframes.
-              }
-            });
-          } catch {
-            // Ignore frame access errors during navigation.
-          }
-        };
-
-        const bindFrameUiObserver = () => {
-          if (!frame) return;
-          let frameDoc = null;
-          try {
-            frameDoc = frame.contentDocument;
-          } catch {
-            return;
-          }
-          if (!frameDoc || frameDoc === observedUiDocument) return;
-          observedUiDocument = frameDoc;
-
-          if (frameUiObserver) {
-            frameUiObserver.disconnect();
-            frameUiObserver = null;
-          }
-
-          const root = frameDoc.documentElement;
-          if (!root) return;
-
-          frameUiObserver = new MutationObserver(() => {
-            hideAstroDevToolbarInFrameTree();
-          });
-
-          frameUiObserver.observe(root, {
-            childList: true,
-            subtree: true,
-          });
-
-          hideAstroDevToolbarInFrameTree();
-        };
-
-        const callWindowControl = fnName => {
-          const fn = api && api[fnName];
-          if (typeof fn !== "function") {
-            log(`Window control unavailable: ${fnName}`);
-            return;
-          }
-          fn().catch(() => {
-            log(`Window control failed: ${fnName}`);
-          });
-        };
-
-        document
-          .getElementById("open-site-btn")
-          ?.addEventListener("click", () => {
-            if (!api?.openExternal) {
-              log("Open site unavailable.");
-              return;
-            }
-            api.openExternal(siteUrl).catch(() => {
-              log("Failed to open site.");
-            });
-          });
-
-        document
-          .getElementById("toggle-console-btn")
-          ?.addEventListener("click", () => {
-            if (!consoleEl) return;
-            consoleEl.classList.toggle("minimized");
-          });
-
-        document
-          .getElementById("reload-shell-btn")
-          ?.addEventListener("click", () => {
-            log("Reloading workspace...");
-            window.location.reload();
-          });
-
-        document
-          .getElementById("clear-console-btn")
-          ?.addEventListener("click", () => {
-            if (consoleBody) consoleBody.textContent = "";
-          });
-
-        const bindWindowControl = (id, fnName) => {
-          const el = document.getElementById(id);
-          if (!el) return;
-          el.addEventListener("pointerdown", event => {
-            event.preventDefault();
-            event.stopPropagation();
-          });
-          el.addEventListener("click", event => {
-            event.preventDefault();
-            event.stopPropagation();
-            callWindowControl(fnName);
-          });
-        };
-
-        bindWindowControl("min-btn", "minimizeWindow");
-        bindWindowControl("max-btn", "maximizeWindow");
-        bindWindowControl("close-btn", "closeWindow");
-
-        frame?.addEventListener("load", () => {
-          requestThemeFromEditor();
-          bindFrameThemeObserver();
-          bindFrameUiObserver();
-          syncThemeFromFrame();
-          hideAstroDevToolbarInFrameTree();
-        });
-
-        const runBuild = () => {
-          if (!api || !buildBtn) return;
-          if (buildBtn.classList.contains("busy")) return;
-
-          setBusy(true);
-          setStatus("Building...");
-          log("Build started.");
-
-          api.runReadyProd().catch(() => {
-            setBusy(false);
-            setStatus("Build failed");
-            log("Build command failed to start.");
-          });
-        };
-
-        buildBtn?.addEventListener("click", runBuild);
-
-        document.addEventListener("keydown", event => {
-          if (!(event.ctrlKey || event.metaKey)) return;
-          const key = event.key.toLowerCase();
-
-          if (key === "r") {
-            event.preventDefault();
-            reloadFrame();
-          }
-
-          if (key === "c") {
-            event.preventDefault();
-            consoleEl?.classList.toggle("minimized");
-          }
-        });
-
-        document.addEventListener("contextmenu", event => {
-          event.preventDefault();
-          api?.showContextMenu().catch(() => {});
-        });
-
-        window.addEventListener("message", event => {
-          if (messageOrigin !== "*" && event.origin !== messageOrigin) return;
-          if (frame?.contentWindow && event.source !== frame.contentWindow) return;
-          if (event.data?.type !== "editor-theme") return;
-          applyShellTheme(event.data.value);
-        });
-
-        api?.onRefreshCms(() => {
-          reloadFrame();
-        });
-
-        api?.onReadyProdEvent(payload => {
-          if (!payload) return;
-          if (payload.type === "start" || payload.type === "trigger" || payload.type === "busy") {
-            setBusy(true);
-            setStatus("Building...");
-            log(payload.message || "Build running...");
-            return;
-          }
-
-          if (payload.type === "log") {
-            log(payload.message || "");
-            return;
-          }
-
-          if (payload.type === "success") {
-            setBusy(false);
-            setStatus("Ready");
-            log(payload.message || "Build finished.");
-            api.showNotification("Build Complete", "Your site has been built successfully!").catch(() => {});
-            return;
-          }
-
-          if (payload.type === "failure" || payload.type === "error") {
-            setBusy(false);
-            setStatus("Build failed");
-            log(payload.message || "Build failed.");
-            api.showNotification("Build Failed", payload.message || "Build failed").catch(() => {});
-          }
-        });
-
-        api?.getReadyProdStatus().then(status => {
-          if (status?.running) {
-            setBusy(true);
-            setStatus("Building...");
-            log("Build already in progress.");
-          } else {
-            setBusy(false);
-            setStatus("Ready");
-          }
-        });
-
-        const preferredTheme =
-          window.matchMedia &&
-          window.matchMedia("(prefers-color-scheme: light)").matches
-            ? "light"
-            : "dark";
-        applyShellTheme(preferredTheme);
-        requestThemeFromEditor();
-
-        const themeSyncTimer = window.setInterval(() => {
-          bindFrameThemeObserver();
-          bindFrameUiObserver();
-          syncThemeFromFrame();
-          hideAstroDevToolbarInFrameTree();
-        }, 1200);
-
-        window.addEventListener("beforeunload", () => {
-          window.clearInterval(themeSyncTimer);
-          if (frameThemeObserver) frameThemeObserver.disconnect();
-          if (frameUiObserver) frameUiObserver.disconnect();
-        });
-
-        log("Companion shell initialized.");
-      })();
-    </script>
+    <script src="./shell.js"></script>
   </body>
 </html>
+

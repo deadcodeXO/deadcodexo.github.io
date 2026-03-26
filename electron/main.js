@@ -1,9 +1,17 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell, Notification } from "electron";
 import { spawn } from "node:child_process";
-import { createWriteStream, existsSync } from "node:fs";
+import {
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import net from "node:net";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { provisionWorkspaceFromPayload } from "./provision.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -17,6 +25,58 @@ const DEV_SERVER_URL = `http://${DEV_SERVER_HOST}:${DEV_SERVER_PORT}`; // Astro 
 
 const DEFAULT_DECAP_PORT = 8081;            // Default Decap CMS proxy port
 const MAX_DECAP_PORT = 8199;                // Optional upper bound if auto-incrementing ports
+const MAX_WORKSPACE_FILES = 5000;
+const MAX_WORKSPACE_FILE_SIZE_BYTES = 2 * 1024 * 1024;
+const WORKSPACE_IGNORED_DIRS = new Set([
+  ".git",
+  ".astro",
+  ".dcx",
+  "node_modules",
+  "dist",
+  "release",
+  "release-fresh",
+]);
+const WORKSPACE_IGNORED_FILES = new Set([
+  "package-lock.json",
+  "pnpm-lock.yaml",
+  "yarn.lock",
+]);
+const WORKSPACE_TEXT_EXTENSIONS = new Set([
+  ".astro",
+  ".md",
+  ".mdx",
+  ".txt",
+  ".json",
+  ".jsonc",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+  ".ts",
+  ".tsx",
+  ".css",
+  ".scss",
+  ".sass",
+  ".less",
+  ".html",
+  ".yml",
+  ".yaml",
+  ".toml",
+  ".xml",
+  ".svg",
+  ".sh",
+  ".ps1",
+  ".bat",
+  ".cmd",
+  ".env",
+  ".ini",
+  ".conf",
+  ".gitignore",
+  ".prettierignore",
+  ".dockerignore",
+  ".eslintignore",
+  ".editorconfig",
+]);
 
 let mainWindow = null;
 let splashWindow = null;
@@ -34,6 +94,96 @@ const startupLogTail = [];
 
 let readyProdRunning = false;
 let readyProdLastStatus = "idle";
+
+function toPosixPath(value) {
+  return value.replaceAll("\\", "/");
+}
+
+function isPathInsideWorkspace(targetPath) {
+  const normalizeForCompare = value =>
+    process.platform === "win32" ? value.toLowerCase() : value;
+  const root = normalizeForCompare(path.resolve(workspaceRoot));
+  const resolved = normalizeForCompare(path.resolve(targetPath));
+  if (resolved === root) return true;
+  return resolved.startsWith(`${root}${path.sep}`);
+}
+
+function resolveWorkspacePath(relativePath) {
+  if (typeof relativePath !== "string" || !relativePath.trim()) {
+    throw new Error("Expected a non-empty workspace path.");
+  }
+
+  const normalizedInput = relativePath.replaceAll("/", path.sep).replaceAll("\\", path.sep);
+  const resolved = path.resolve(workspaceRoot, normalizedInput);
+  if (!isPathInsideWorkspace(resolved)) {
+    throw new Error(`Workspace path is outside the repo root: ${relativePath}`);
+  }
+
+  return resolved;
+}
+
+function isTextWorkspaceFile(fileName) {
+  const base = fileName.toLowerCase();
+  if (WORKSPACE_IGNORED_FILES.has(base)) return false;
+
+  const extension = path.extname(base);
+  if (!extension) {
+    return true;
+  }
+
+  return WORKSPACE_TEXT_EXTENSIONS.has(extension);
+}
+
+function listWorkspaceFiles() {
+  const files = [];
+
+  const walk = relativeDir => {
+    const absoluteDir = relativeDir
+      ? path.join(workspaceRoot, relativeDir)
+      : workspaceRoot;
+
+    const entries = readdirSync(absoluteDir, { withFileTypes: true })
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    for (const entry of entries) {
+      if (entry.name === "." || entry.name === "..") continue;
+      const relativePath = relativeDir
+        ? path.join(relativeDir, entry.name)
+        : entry.name;
+
+      if (entry.isDirectory()) {
+        if (WORKSPACE_IGNORED_DIRS.has(entry.name)) continue;
+        walk(relativePath);
+        if (files.length >= MAX_WORKSPACE_FILES) return;
+        continue;
+      }
+
+      if (!entry.isFile()) continue;
+      if (!isTextWorkspaceFile(entry.name)) continue;
+
+      files.push(toPosixPath(relativePath));
+      if (files.length >= MAX_WORKSPACE_FILES) return;
+    }
+  };
+
+  walk("");
+  return files;
+}
+
+function getMonacoBaseUrl() {
+  const localMonacoDir = path.join(
+    workspaceRoot,
+    "node_modules",
+    "monaco-editor",
+    "min",
+    "vs"
+  );
+  if (existsSync(localMonacoDir)) {
+    return pathToFileURL(localMonacoDir).toString();
+  }
+
+  return "https://cdn.jsdelivr.net/npm/monaco-editor@0.53.0/min/vs";
+}
 
 
 function stripAnsi(value) {
@@ -249,6 +399,66 @@ ipcMain.handle("show-context-menu", () => {
   menu.popup({ window: mainWindow });
 });
 
+ipcMain.handle("workspace-info", () => ({
+  rootName: path.basename(workspaceRoot),
+  rootPath: workspaceRoot,
+}));
+
+ipcMain.handle("workspace-list-files", () => {
+  const files = listWorkspaceFiles();
+  return {
+    files,
+    truncated: files.length >= MAX_WORKSPACE_FILES,
+  };
+});
+
+ipcMain.handle("workspace-read-file", (_event, relativePath) => {
+  const absolutePath = resolveWorkspacePath(relativePath);
+  const fileStat = statSync(absolutePath);
+  if (!fileStat.isFile()) {
+    throw new Error(`Not a file: ${relativePath}`);
+  }
+
+  if (fileStat.size > MAX_WORKSPACE_FILE_SIZE_BYTES) {
+    throw new Error(
+      `File too large for in-app editor (${String(fileStat.size)} bytes): ${relativePath}`
+    );
+  }
+
+  const contents = readFileSync(absolutePath, "utf8");
+  return {
+    path: toPosixPath(relativePath),
+    contents,
+    size: fileStat.size,
+    mtimeMs: fileStat.mtimeMs,
+  };
+});
+
+ipcMain.handle("workspace-write-file", (_event, relativePath, contents) => {
+  if (typeof contents !== "string") {
+    throw new Error("Expected file contents as a string.");
+  }
+
+  const absolutePath = resolveWorkspacePath(relativePath);
+  if (!isTextWorkspaceFile(path.basename(absolutePath))) {
+    throw new Error(`This file type is not writable in the in-app editor: ${relativePath}`);
+  }
+
+  mkdirSync(path.dirname(absolutePath), { recursive: true });
+  writeFileSync(absolutePath, contents, "utf8");
+  const updatedStat = statSync(absolutePath);
+
+  return {
+    path: toPosixPath(relativePath),
+    size: updatedStat.size,
+    mtimeMs: updatedStat.mtimeMs,
+  };
+});
+
+ipcMain.handle("workspace-monaco-base-url", () => ({
+  baseUrl: getMonacoBaseUrl(),
+}));
+
 function isWorkspaceRoot(candidatePath) {
   return (
     existsSync(path.join(candidatePath, "package.json")) &&
@@ -441,8 +651,16 @@ function getCmsServerPaths() {
     "dist",
     "index.js"
   );
+  const monacoLoaderPath = path.join(
+    workspaceRoot,
+    "node_modules",
+    "monaco-editor",
+    "min",
+    "vs",
+    "loader.js"
+  );
 
-  return { astroCliPath, decapServerPath };
+  return { astroCliPath, decapServerPath, monacoLoaderPath };
 }
 
 function runSetupCommand(label, command, args = []) {
@@ -485,11 +703,12 @@ function runSetupCommand(label, command, args = []) {
 }
 
 async function ensureWorkspaceDependencies() {
-  const { astroCliPath, decapServerPath } = getCmsServerPaths();
+  const { astroCliPath, decapServerPath, monacoLoaderPath } = getCmsServerPaths();
   const astroExists = existsSync(astroCliPath);
   const decapExists = existsSync(decapServerPath);
+  const monacoExists = existsSync(monacoLoaderPath);
 
-  if (astroExists && decapExists) {
+  if (astroExists && decapExists && monacoExists) {
     appendStartupLog("Workspace dependencies already present.");
     setSplashStatus("Checking dependencies...", "Dependencies already installed");
     return;
@@ -503,12 +722,13 @@ async function ensureWorkspaceDependencies() {
 
   const astroInstalled = existsSync(astroCliPath);
   const decapInstalled = existsSync(decapServerPath);
+  const monacoInstalled = existsSync(monacoLoaderPath);
 
-  if (!astroInstalled || !decapInstalled) {
+  if (!astroInstalled || !decapInstalled || !monacoInstalled) {
     throw new Error(
       `Dependency install completed, but required binaries were not found. Missing: ${
         !astroInstalled ? "astro " : ""
-      }${!decapInstalled ? "decap-server" : ""}`.trim()
+      }${!decapInstalled ? "decap-server " : ""}${!monacoInstalled ? "monaco-editor" : ""}`.trim()
     );
   }
 

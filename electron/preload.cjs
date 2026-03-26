@@ -18,6 +18,14 @@ try {
     showNotification: (title, body) =>
       ipcRenderer.invoke("show-notification", title, body),
     showContextMenu: () => ipcRenderer.invoke("show-context-menu"),
+    getWorkspaceInfo: () => ipcRenderer.invoke("workspace-info"),
+    listWorkspaceFiles: () => ipcRenderer.invoke("workspace-list-files"),
+    readWorkspaceFile: relativePath =>
+      ipcRenderer.invoke("workspace-read-file", relativePath),
+    writeWorkspaceFile: (relativePath, contents) =>
+      ipcRenderer.invoke("workspace-write-file", relativePath, contents),
+    getWorkspaceMonacoBaseUrl: () =>
+      ipcRenderer.invoke("workspace-monaco-base-url"),
     onRefreshCms: callback => {
       const listener = () => callback();
       ipcRenderer.on("refresh-cms", listener);

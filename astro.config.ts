@@ -12,9 +12,15 @@ import {
 import { transformerFileName } from "./src/utils/transformers/fileName";
 import { SITE } from "./src/config";
 
+const isCompanionLaunch = process.env.DCX_COMPANION === "1";
+const isDevToolbarEnabled = SITE.devToolbar.enabled && !isCompanionLaunch;
+
 // https://astro.build/config
 export default defineConfig({
   site: SITE.website,
+  devToolbar: {
+    enabled: isDevToolbarEnabled,
+  },
   integrations: [
     mdx({
       extendMarkdownConfig: true,

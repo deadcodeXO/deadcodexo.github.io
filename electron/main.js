@@ -528,7 +528,9 @@ async function startCmsServer() {
     "--port",
     String(DEV_SERVER_PORT),
     "--strictPort",
-  ]);
+  ], {
+    DCX_COMPANION: "1",
+  });
   const decapProcess = spawnNodeProcess("decap", decapServerPath, [], {
     PORT: String(decapServerPort),
     BIND_HOST: DEV_SERVER_HOST,

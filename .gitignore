@@ -11,6 +11,9 @@ release/
 # dependencies
 node_modules/
 
+# scripts
+scripts/
+
 # logs
 npm-debug.log*
 yarn-debug.log*

@@ -1,0 +1,126 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import Header from "@/components/Header.astro";
+import Breadcrumb from "@/components/Breadcrumb.astro";
+
+const isDev = import.meta.env.DEV;
+---
+
+<Layout title="Editor | DEADCODEXO">
+  <Header />
+  <Breadcrumb />
+  <main id="main-content" class="app-layout pt-3 pb-12">
+    <section class="mx-auto w-full max-w-6xl rounded-2xl border border-border/40 bg-background/75 p-6 backdrop-blur-sm">
+      <h1 class="text-2xl font-semibold text-accent">Content Editor</h1>
+      {
+        isDev ? (
+          <div class="mt-5 overflow-hidden rounded-xl border border-border/40 bg-background/40">
+            <iframe
+              id="cms-frame"
+              src="/admin/"
+              title="Decap CMS"
+              class="h-[74vh] min-h-[640px] w-full"
+            ></iframe>
+          </div>
+        ) : (
+          <p class="mt-3 opacity-80">
+            The `/editor` route is intended for local development.
+          </p>
+        )
+      }
+    </section>
+  </main>
+
+  {
+    isDev && (
+      <script is:inline>
+        (() => {
+          if (window.__cmsThemeSyncInitialized) return;
+          window.__cmsThemeSyncInitialized = true;
+
+          const resolveCmsFrameSrc = () => {
+            const search = new URLSearchParams(window.location.search);
+            const proxyPort = search.get("cms_proxy_port");
+            if (!proxyPort || !/^\d+$/.test(proxyPort)) return "/admin/";
+            return `/admin/?cms_proxy_port=${encodeURIComponent(proxyPort)}`;
+          };
+
+          const sendThemeToCmsFrame = () => {
+            const frame = document.getElementById("cms-frame");
+            if (!frame || !frame.contentWindow) return;
+
+            const currentTheme =
+              document.documentElement.getAttribute("data-theme") ||
+              localStorage.getItem("theme") ||
+              "dark";
+
+            frame.contentWindow.postMessage(
+              { type: "site-theme", value: currentTheme },
+              window.location.origin
+            );
+
+            if (window.parent && window.parent !== window) {
+              window.parent.postMessage(
+                { type: "editor-theme", value: currentTheme },
+                "*"
+              );
+            }
+          };
+
+          const applyTheme = value => {
+            const nextTheme = value === "light" ? "light" : "dark";
+            document.documentElement.setAttribute("data-theme", nextTheme);
+            localStorage.setItem("theme", nextTheme);
+            sendThemeToCmsFrame();
+          };
+
+          const setupCmsThemeSync = () => {
+            if (window.__cmsThemeSyncBound) return;
+            window.__cmsThemeSyncBound = true;
+
+            const frame = document.getElementById("cms-frame");
+            if (!frame) return;
+
+            const nextSrc = resolveCmsFrameSrc();
+            if (frame.getAttribute("src") !== nextSrc) {
+              frame.setAttribute("src", nextSrc);
+            }
+
+            frame.addEventListener("load", sendThemeToCmsFrame);
+            sendThemeToCmsFrame();
+
+            const observer = new MutationObserver(sendThemeToCmsFrame);
+            observer.observe(document.documentElement, {
+              attributes: true,
+              attributeFilter: ["data-theme"],
+            });
+
+            window.addEventListener("storage", event => {
+              if (event.key === "theme") sendThemeToCmsFrame();
+            });
+
+            window.addEventListener("message", event => {
+              const messageType = event.data?.type;
+              if (messageType === "companion-theme") {
+                applyTheme(event.data.value);
+                return;
+              }
+              if (messageType === "companion-request-theme") {
+                sendThemeToCmsFrame();
+              }
+            });
+          };
+
+          document.addEventListener("astro:page-load", setupCmsThemeSync);
+          setupCmsThemeSync();
+        })();
+      </script>
+    )
+  }
+
+  <style>
+    #cms-frame {
+      background: var(--background);
+    }
+  </style>
+</Layout>

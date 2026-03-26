@@ -7,6 +7,7 @@ import Breadcrumb from "@/components/Breadcrumb.astro";
 import { SITE } from "@/config";
 
 const backUrl = SITE.showBackButton ? `${Astro.url.pathname}` : "/";
+const isDev = import.meta.env.DEV;
 ---
 
 <Layout title={`Search | ${SITE.title}`}>
@@ -34,7 +35,17 @@ const backUrl = SITE.showBackButton ? `${Astro.url.pathname}` : "/";
       <div class="search-aurora" data-card-aurora></div>
       <div class="search-border-glow" data-card-border></div>
       <div class="search-inner">
-        <div id="pagefind-search" class="premium-search" transition:persist data-backurl={backUrl}>
+        <div id="pagefind-search" class="premium-search" data-backurl={backUrl}>
+          {
+            isDev && (
+              <div class="dev-search-notice">
+                <p>
+                  Search index is unavailable in dev mode until you run a build.
+                </p>
+                <code>npm run build</code>
+              </div>
+            )
+          }
         </div>
       </div>
     </div>
@@ -50,6 +61,39 @@ const backUrl = SITE.showBackButton ? `${Astro.url.pathname}` : "/";
     if (searchCleanup) searchCleanup.abort();
     searchCleanup = new AbortController();
     const { signal } = searchCleanup;
+
+    // In the companion iframe, force hard navigation when leaving /search.
+    // This avoids transition carry-over glitches observed after visiting this route.
+    const forceHardNavigation = (event: MouseEvent) => {
+      if (event.defaultPrevented) return;
+      if (event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+
+      const rawTarget = event.target;
+      if (!(rawTarget instanceof Element)) return;
+      const anchor = rawTarget.closest("a[href]");
+      if (!(anchor instanceof HTMLAnchorElement)) return;
+      if (anchor.target === "_blank" || anchor.hasAttribute("download")) return;
+
+      const href = anchor.getAttribute("href");
+      if (!href || href.startsWith("#")) return;
+
+      let url: URL;
+      try {
+        url = new URL(href, window.location.href);
+      } catch {
+        return;
+      }
+      if (url.origin !== window.location.origin) return;
+
+      event.preventDefault();
+      window.location.href = `${url.pathname}${url.search}${url.hash}`;
+    };
+
+    document.addEventListener("click", forceHardNavigation, {
+      capture: true,
+      signal,
+    });
 
     // Hero mouse-follow
     const hero = document.querySelector("[data-search-hero]") as HTMLElement;
@@ -119,8 +163,11 @@ const backUrl = SITE.showBackButton ? `${Astro.url.pathname}` : "/";
     const pageFindSearch: HTMLElement | null =
       document.querySelector("#pagefind-search");
 
-    // If container doesn't exist or already has content (initialized), stop.
-    if (!pageFindSearch || pageFindSearch.childElementCount > 0) return;
+    const hasPagefindUi = () =>
+      Boolean(pageFindSearch?.querySelector(".pagefind-ui"));
+
+    // If container doesn't exist or Pagefind is already mounted, stop.
+    if (!pageFindSearch || hasPagefindUi()) return;
 
     const params = new URLSearchParams(window.location.search);
 
@@ -128,7 +175,7 @@ const backUrl = SITE.showBackButton ? `${Astro.url.pathname}` : "/";
 
     onIdle(async () => {
       // Prevent double initialization
-      if (pageFindSearch.childElementCount > 0) return;
+      if (hasPagefindUi()) return;
 
       // @ts-expect-error — Missing types for @pagefind/default-ui package.
       const { PagefindUI } = await import("@pagefind/default-ui");
@@ -182,16 +229,6 @@ const backUrl = SITE.showBackButton ? `${Astro.url.pathname}` : "/";
 
         return data;
       };
-
-      // Display warning in dev mode
-      if (import.meta.env.DEV) {
-        pageFindSearch.innerHTML = `
-            <div class="bg-muted/75 rounded p-4 space-y-4 mb-4">
-              <p><strong>DEV mode Warning! </strong>You need to build the project at least once to see the search results during development.</p>
-              <code class="block bg-black text-white px-2 py-1 rounded">pnpm run build</code>
-            </div>
-          `;
-      }
 
       const search = new PagefindUI({
         element: "#pagefind-search",
@@ -445,5 +482,30 @@ const backUrl = SITE.showBackButton ? `${Astro.url.pathname}` : "/";
   .search-inner {
     position: relative;
     z-index: 2;
+  }
+
+  .dev-search-notice {
+    border: 1px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
+    border-radius: 0.9rem;
+    background: color-mix(in srgb, var(--color-accent) 10%, var(--color-background));
+    color: var(--color-foreground);
+    padding: 1rem 1.1rem;
+    display: grid;
+    gap: 0.65rem;
+  }
+
+  .dev-search-notice p {
+    margin: 0;
+    line-height: 1.55;
+  }
+
+  .dev-search-notice code {
+    width: fit-content;
+    background: #0d1117;
+    color: #d2e2ff;
+    border: 1px solid color-mix(in srgb, var(--color-accent) 26%, transparent);
+    border-radius: 0.5rem;
+    padding: 0.35rem 0.55rem;
+    font-size: 0.83rem;
   }
 </style>

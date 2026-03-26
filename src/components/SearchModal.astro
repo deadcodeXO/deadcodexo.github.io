@@ -8,6 +8,7 @@ import "@pagefind/default-ui/css/ui.css";
   class="search-modal-overlay"
   role="dialog"
   aria-modal="true"
+  aria-hidden="true"
   aria-label="Search this site"
 >
   <div class="search-modal-backdrop" data-search-close></div>
@@ -136,6 +137,14 @@ import "@pagefind/default-ui/css/ui.css";
     ) as HTMLElement;
     let pagefindLoaded = false;
 
+    const resetModalState = () => {
+      modal.classList.remove("active");
+      modal.setAttribute("aria-hidden", "true");
+      document.body.style.overflow = "";
+    };
+
+    resetModalState();
+
     // Mouse follow glow on card
     if (card && glow) {
       card.addEventListener(
@@ -164,6 +173,7 @@ import "@pagefind/default-ui/css/ui.css";
 
     function openModal() {
       modal!.classList.add("active");
+      modal!.setAttribute("aria-hidden", "false");
       document.body.style.overflow = "hidden";
 
       if (!pagefindLoaded) {
@@ -181,6 +191,7 @@ import "@pagefind/default-ui/css/ui.css";
 
     function closeModal() {
       modal!.classList.remove("active");
+      modal!.setAttribute("aria-hidden", "true");
       document.body.style.overflow = "";
     }
 
@@ -383,6 +394,8 @@ import "@pagefind/default-ui/css/ui.css";
       },
       { signal }
     );
+
+    document.addEventListener("astro:before-swap", closeModal, { signal });
   }
 
   // Initialize on load and on view transitions navigation

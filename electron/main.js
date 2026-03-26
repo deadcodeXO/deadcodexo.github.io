@@ -1,9 +1,10 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell, Notification } from "electron";
 import { spawn } from "node:child_process";
-import { createWriteStream, existsSync, watch } from "node:fs";
+import { createWriteStream, existsSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { provisionWorkspaceFromPayload } from "./provision.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,7 +29,6 @@ const startupLogTail = [];
 
 let readyProdRunning = false;
 let readyProdLastStatus = "idle";
-let readyProdWatchTimer = null;
 
 
 function stripAnsi(value) {
@@ -123,33 +123,6 @@ function runReadyProdProcess() {
       }
     });
   });
-}
-
-function setupReadyProdWatcher() {
-  const watchPaths = [
-    path.join(workspaceRoot, "src", "data", "blog"),
-    path.join(workspaceRoot, "src", "data", "galleries"),
-    path.join(workspaceRoot, "src", "data", "pages"),
-  ];
-
-  for (const watchPath of watchPaths) {
-    if (!existsSync(watchPath)) continue;
-
-    try {
-      watch(watchPath, { recursive: true }, (_, filename) => {
-        if (!filename) return;
-
-        if (readyProdWatchTimer) clearTimeout(readyProdWatchTimer);
-
-        readyProdWatchTimer = setTimeout(() => {
-          sendReadyProdEvent({ type: "trigger", message: "Content changed, running readyprod" });
-          runReadyProdProcess().catch(() => {});
-        }, 2200);
-      });
-    } catch (error) {
-      appendStartupLog(`readyprod watcher error for ${watchPath}: ${error.message}`);
-    }
-  }
 }
 
 ipcMain.handle("run-readyprod", async () => runReadyProdProcess());
@@ -363,17 +336,7 @@ function createAppMenu() {
   const template = [
     {
       label: "File",
-      submenu: [
-        {
-          label: "Run readyprod",
-          accelerator: "CmdOrCtrl+R",
-          click: () => {
-            runReadyProdProcess().catch(() => {});
-          },
-        },
-        { type: "separator" },
-        { role: "quit" },
-      ],
+      submenu: [{ role: "quit" }],
     },
     {
       label: "View",
@@ -409,6 +372,93 @@ function spawnNodeProcess(label, scriptPath, args = [], extraEnv = {}) {
   });
 
   return proc;
+}
+
+function getCmsServerPaths() {
+  const astroCliPath = path.join(
+    workspaceRoot,
+    "node_modules",
+    "astro",
+    "bin",
+    "astro.mjs"
+  );
+  const decapServerPath = path.join(
+    workspaceRoot,
+    "node_modules",
+    "decap-server",
+    "dist",
+    "index.js"
+  );
+
+  return { astroCliPath, decapServerPath };
+}
+
+function runSetupCommand(label, command, args = []) {
+  return new Promise((resolve, reject) => {
+    const isWin = process.platform === "win32";
+    const proc = spawn(command, args, {
+      cwd: workspaceRoot,
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: isWin,
+      env: {
+        ...process.env,
+        FORCE_COLOR: "0",
+      },
+    });
+
+    proc.stdout?.on("data", chunk => {
+      const text = stripAnsi(String(chunk)).trim();
+      if (text) appendStartupLog(`[${label}] ${text}`);
+    });
+
+    proc.stderr?.on("data", chunk => {
+      const text = stripAnsi(String(chunk)).trim();
+      if (text) appendStartupLog(`[${label}:err] ${text}`);
+    });
+
+    proc.on("error", error => {
+      reject(new Error(`${label} failed to start: ${error.message}`));
+    });
+
+    proc.on("close", code => {
+      if (code === 0) {
+        resolve(undefined);
+        return;
+      }
+
+      reject(new Error(`${label} failed with exit code ${String(code)}.`));
+    });
+  });
+}
+
+async function ensureWorkspaceDependencies() {
+  const { astroCliPath, decapServerPath } = getCmsServerPaths();
+  const astroExists = existsSync(astroCliPath);
+  const decapExists = existsSync(decapServerPath);
+
+  if (astroExists && decapExists) {
+    appendStartupLog("Workspace dependencies already present.");
+    return;
+  }
+
+  appendStartupLog(
+    "Workspace dependencies missing. Running npm install (first launch on fresh clone)."
+  );
+  await runSetupCommand("deps", "npm", ["install", "--no-audit", "--no-fund"]);
+
+  const astroInstalled = existsSync(astroCliPath);
+  const decapInstalled = existsSync(decapServerPath);
+
+  if (!astroInstalled || !decapInstalled) {
+    throw new Error(
+      `Dependency install completed, but required binaries were not found. Missing: ${
+        !astroInstalled ? "astro " : ""
+      }${!decapInstalled ? "decap-server" : ""}`.trim()
+    );
+  }
+
+  appendStartupLog("Workspace dependencies installed successfully.");
 }
 
 function isPortAvailable(host, port) {
@@ -449,20 +499,7 @@ function watchForEarlyExit() {
 }
 
 async function startCmsServer() {
-  const astroCliPath = path.join(
-    workspaceRoot,
-    "node_modules",
-    "astro",
-    "bin",
-    "astro.mjs"
-  );
-  const decapServerPath = path.join(
-    workspaceRoot,
-    "node_modules",
-    "decap-server",
-    "dist",
-    "index.js"
-  );
+  const { astroCliPath, decapServerPath } = getCmsServerPaths();
 
   if (!existsSync(astroCliPath)) {
     throw new Error(
@@ -567,13 +604,25 @@ app.whenReady().then(async () => {
     );
     createSplashWindow();
     setSplashProgress(20);
+    appendStartupLog("Checking workspace companion payload...");
+    const provisionSummary = provisionWorkspaceFromPayload({
+      workspaceRoot,
+      log: appendStartupLog,
+    });
+    if (provisionSummary.created > 0) {
+      appendStartupLog(
+        `Provisioned ${String(provisionSummary.created)} missing companion file(s).`
+      );
+    }
+    setSplashProgress(30);
+    await ensureWorkspaceDependencies();
+    setSplashProgress(42);
 
     const earlyExitPromise = startCmsServer();
-    setSplashProgress(50);
+    setSplashProgress(55);
     await waitForCmsServer(earlyExitPromise);
     createMainWindow();
     createAppMenu();
-    setupReadyProdWatcher();
   } catch (error) {
     if (splashWindow && !splashWindow.isDestroyed()) {
       splashWindow.close();

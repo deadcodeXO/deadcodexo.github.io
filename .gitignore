@@ -48,3 +48,6 @@ IDIOT.md
 # local screenshots / captures (do not publish from repo root)
 newss*.png
 neweditor.png
+
+# local companion provisioner state
+.dcx/

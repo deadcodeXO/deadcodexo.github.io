@@ -199,6 +199,52 @@ const structuredData = pubDatetime
 
     <!-- Load full theme logic -->
     <script src="../scripts/theme.ts"></script>
+    <script is:inline>
+      (() => {
+        if (window.__companionThemeBridgeInitialized) return;
+        window.__companionThemeBridgeInitialized = true;
+
+        const normalizeTheme = value => (value === "light" ? "light" : "dark");
+
+        const readTheme = () =>
+          normalizeTheme(
+            document.documentElement.getAttribute("data-theme") ||
+              localStorage.getItem("theme") ||
+              (window.matchMedia &&
+              window.matchMedia("(prefers-color-scheme: light)").matches
+                ? "light"
+                : "dark")
+          );
+
+        const postThemeToParent = () => {
+          if (!window.parent || window.parent === window) return;
+          window.parent.postMessage(
+            { type: "editor-theme", value: readTheme() },
+            "*"
+          );
+        };
+
+        const observer = new MutationObserver(mutations => {
+          const hasThemeChange = mutations.some(
+            mutation => mutation.attributeName === "data-theme"
+          );
+          if (hasThemeChange) postThemeToParent();
+        });
+
+        observer.observe(document.documentElement, {
+          attributes: true,
+          attributeFilter: ["data-theme"],
+        });
+
+        window.addEventListener("storage", event => {
+          if (event.key === "theme") postThemeToParent();
+        });
+
+        document.addEventListener("astro:page-load", postThemeToParent);
+        document.addEventListener("astro:after-swap", postThemeToParent);
+        postThemeToParent();
+      })();
+    </script>
   </body>
 </html>
 

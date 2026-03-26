@@ -462,6 +462,8 @@
           }
         })();
         const messageOrigin = editorOrigin ?? siteOrigin ?? "*";
+        let frameThemeObserver = null;
+        let observedThemeDocument = null;
 
         if (frame) frame.src = editorUrl;
 
@@ -503,6 +505,56 @@
             { type: "companion-request-theme" },
             messageOrigin
           );
+        };
+
+        const readThemeFromFrame = () => {
+          if (!frame) return null;
+          try {
+            const doc = frame.contentDocument;
+            const themeAttr = doc?.documentElement?.getAttribute("data-theme");
+            if (themeAttr === "light" || themeAttr === "dark") return themeAttr;
+            const stored = frame.contentWindow?.localStorage?.getItem("theme");
+            if (stored === "light" || stored === "dark") return stored;
+          } catch {
+            return null;
+          }
+          return null;
+        };
+
+        const syncThemeFromFrame = () => {
+          const frameTheme = readThemeFromFrame();
+          if (!frameTheme) return;
+          applyShellTheme(frameTheme);
+        };
+
+        const bindFrameThemeObserver = () => {
+          if (!frame) return;
+          let frameDoc = null;
+          try {
+            frameDoc = frame.contentDocument;
+          } catch {
+            return;
+          }
+          if (!frameDoc || frameDoc === observedThemeDocument) return;
+          observedThemeDocument = frameDoc;
+
+          if (frameThemeObserver) {
+            frameThemeObserver.disconnect();
+            frameThemeObserver = null;
+          }
+
+          const root = frameDoc.documentElement;
+          if (!root) return;
+
+          frameThemeObserver = new MutationObserver(() => {
+            syncThemeFromFrame();
+          });
+
+          frameThemeObserver.observe(root, {
+            attributes: true,
+            attributeFilter: ["data-theme"],
+          });
+          syncThemeFromFrame();
         };
 
         const callWindowControl = fnName => {
@@ -568,6 +620,8 @@
 
         frame?.addEventListener("load", () => {
           requestThemeFromEditor();
+          bindFrameThemeObserver();
+          syncThemeFromFrame();
         });
 
         const runBuild = () => {
@@ -590,11 +644,6 @@
         document.addEventListener("keydown", event => {
           if (!(event.ctrlKey || event.metaKey)) return;
           const key = event.key.toLowerCase();
-
-          if (key === "b") {
-            event.preventDefault();
-            runBuild();
-          }
 
           if (key === "r") {
             event.preventDefault();
@@ -671,6 +720,16 @@
             : "dark";
         applyShellTheme(preferredTheme);
         requestThemeFromEditor();
+
+        const themeSyncTimer = window.setInterval(() => {
+          bindFrameThemeObserver();
+          syncThemeFromFrame();
+        }, 1200);
+
+        window.addEventListener("beforeunload", () => {
+          window.clearInterval(themeSyncTimer);
+          if (frameThemeObserver) frameThemeObserver.disconnect();
+        });
 
         log("Companion shell initialized.");
       })();

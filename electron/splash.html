@@ -103,8 +103,8 @@
   <body>
     <div class="panel">
       <img src="./logo.png" alt="DeadCodeXO logo" />
-      <p>Starting content editor...</p>
-      <div class="subtle">Launching Astro + Decap CMS</div>
+      <p id="status-title">Starting content editor...</p>
+      <div class="subtle" id="status-detail">Launching Astro + Decap CMS</div>
       <div class="progress-bar">
         <div class="progress-fill" id="progress-fill"></div>
       </div>
@@ -114,6 +114,17 @@
     window.setProgress = function(percent) {
       const fill = document.getElementById('progress-fill');
       if (fill) fill.style.width = percent + '%';
+    };
+
+    window.setSplashStatus = function(title, detail) {
+      const titleEl = document.getElementById('status-title');
+      const detailEl = document.getElementById('status-detail');
+      if (titleEl && typeof title === 'string' && title.length) {
+        titleEl.textContent = title;
+      }
+      if (detailEl && typeof detail === 'string' && detail.length) {
+        detailEl.textContent = detail;
+      }
     };
   </script>
 </html>

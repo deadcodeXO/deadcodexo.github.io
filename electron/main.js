@@ -61,8 +61,18 @@ function sendReadyProdEvent(payload) {
 function setSplashProgress(percent) {
   if (!splashWindow || splashWindow.isDestroyed()) return;
   splashWindow.webContents
-    .executeJavaScript(`setProgress(${String(percent)})`)
+    .executeJavaScript(`window.setProgress?.(${String(percent)})`)
     .catch(error => appendStartupLog(`Splash progress ${String(percent)} error: ${error.message}`));
+}
+
+function setSplashStatus(title, detail = "") {
+  if (!splashWindow || splashWindow.isDestroyed()) return;
+
+  const safeTitle = JSON.stringify(title ?? "");
+  const safeDetail = JSON.stringify(detail ?? "");
+  splashWindow.webContents
+    .executeJavaScript(`window.setSplashStatus?.(${safeTitle}, ${safeDetail})`)
+    .catch(error => appendStartupLog(`Splash status update error: ${error.message}`));
 }
 
 function runReadyProdProcess() {
@@ -265,6 +275,7 @@ function createSplashWindow() {
 
   splashWindow.loadFile(path.join(__dirname, "splash.html"));
   setSplashProgress(10);
+  setSplashStatus("Starting content editor...", "Preparing launcher");
 }
 
 function createMainWindow() {
@@ -439,12 +450,14 @@ async function ensureWorkspaceDependencies() {
 
   if (astroExists && decapExists) {
     appendStartupLog("Workspace dependencies already present.");
+    setSplashStatus("Checking dependencies...", "Dependencies already installed");
     return;
   }
 
   appendStartupLog(
     "Workspace dependencies missing. Running npm install (first launch on fresh clone)."
   );
+  setSplashStatus("Installing dependencies...", "Running npm install for this workspace");
   await runSetupCommand("deps", "npm", ["install", "--no-audit", "--no-fund"]);
 
   const astroInstalled = existsSync(astroCliPath);
@@ -459,6 +472,7 @@ async function ensureWorkspaceDependencies() {
   }
 
   appendStartupLog("Workspace dependencies installed successfully.");
+  setSplashStatus("Dependencies ready.", "Starting local services");
 }
 
 function isPortAvailable(host, port) {
@@ -514,12 +528,17 @@ async function startCmsServer() {
 
   appendStartupLog(`Starting Astro from ${astroCliPath}`);
   appendStartupLog(`Starting Decap server from ${decapServerPath}`);
+  setSplashStatus("Starting local services...", "Booting Astro and Decap");
   decapServerPort = await findAvailablePort(
     DEV_SERVER_HOST,
     DEFAULT_DECAP_PORT,
     MAX_DECAP_PORT
   );
   appendStartupLog(`Using Decap proxy port ${decapServerPort}`);
+  setSplashStatus(
+    "Starting local services...",
+    `Astro on ${DEV_SERVER_PORT}, Decap on ${decapServerPort}`
+  );
 
   const astroProcess = spawnNodeProcess("astro", astroCliPath, [
     "dev",
@@ -549,14 +568,29 @@ async function waitForCmsServer(earlyExitPromise) {
   const serverReadyPromise = (async () => {
     const timeoutMs = 120000;
     const deadline = Date.now() + timeoutMs;
+    const startedAt = Date.now();
+    let probeAttempts = 0;
     let ready = false;
 
     while (Date.now() < deadline) {
+      probeAttempts += 1;
+      if (probeAttempts === 1 || probeAttempts % 10 === 0) {
+        const elapsedSeconds = Math.max(
+          1,
+          Math.round((Date.now() - startedAt) / 1000)
+        );
+        setSplashStatus(
+          "Waiting for local server...",
+          `Checking /editor (${elapsedSeconds}s elapsed)`
+        );
+      }
+
       try {
         const response = await fetch(`${DEV_SERVER_URL}/editor`, { method: "GET", cache: "no-store" });
         appendStartupLog(`[decap] probe response: ${response.status}`);
         if (response.ok) {
           appendStartupLog(`[decap] CMS ready (${response.status})`);
+          setSplashStatus("Launching editor...", "Finalizing app window");
           setSplashProgress(100);
           ready = true;
           break;
@@ -598,15 +632,19 @@ function stopCmsServer() {
 app.whenReady().then(async () => {
   try {
     initStartupLog();
+    createSplashWindow();
+    setSplashProgress(12);
+    setSplashStatus("Detecting workspace...", "Looking for Astro project root");
     workspaceRoot = resolveWorkspaceRoot();
     appendStartupLog(`Workspace root: ${workspaceRoot}`);
     appendStartupLog(`Bundled root: ${bundledProjectRoot}`);
     appendStartupLog(
       `PORTABLE_EXECUTABLE_DIR: ${process.env.PORTABLE_EXECUTABLE_DIR ?? "(not set)"}`
     );
-    createSplashWindow();
+    setSplashStatus("Workspace found.", path.basename(workspaceRoot));
     setSplashProgress(20);
     appendStartupLog("Checking workspace companion payload...");
+    setSplashStatus("Checking companion files...", "Verifying /editor and /admin setup");
     const provisionSummary = provisionWorkspaceFromPayload({
       workspaceRoot,
       log: appendStartupLog,
@@ -617,12 +655,15 @@ app.whenReady().then(async () => {
       );
     }
     setSplashProgress(30);
+    setSplashStatus("Preparing dependencies...", "Validating Astro and Decap packages");
     await ensureWorkspaceDependencies();
     setSplashProgress(42);
 
+    setSplashStatus("Starting services...", "Launching Astro + Decap CMS");
     const earlyExitPromise = startCmsServer();
     setSplashProgress(55);
     await waitForCmsServer(earlyExitPromise);
+    setSplashStatus("Opening editor window...", "Almost ready");
     createMainWindow();
     createAppMenu();
   } catch (error) {

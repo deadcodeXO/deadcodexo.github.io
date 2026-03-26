@@ -8,6 +8,9 @@ release/
 # generated types
 .astro/
 
+# built portable exe
+*.exe
+
 # dependencies
 node_modules/
 

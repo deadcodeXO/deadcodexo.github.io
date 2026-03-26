@@ -32,6 +32,52 @@ const PAYLOAD_ENTRIES = [
   },
 ];
 
+const FALLBACK_PAYLOAD_CONTENTS = new Map([
+  [
+    "scripts/remove-dev-routes.cjs",
+    `const fs = require("node:fs");
+const path = require("node:path");
+
+const distDir = path.join(process.cwd(), "dist");
+const devOnlyRoutes = ["editor", "edit", "admin"];
+
+for (const route of devOnlyRoutes) {
+  const routePath = path.join(distDir, route);
+  if (fs.existsSync(routePath)) {
+    fs.rmSync(routePath, { recursive: true, force: true });
+    console.log(\`[remove-dev-routes] removed \${routePath}\`);
+  }
+}
+
+const sitemapPath = path.join(distDir, "sitemap-0.xml");
+if (fs.existsSync(sitemapPath)) {
+  const xml = fs.readFileSync(sitemapPath, "utf8");
+  const cleaned = xml.replace(
+    /<url><loc>[^<]*\\/(?:editor|edit|admin)\\/?<\\/loc><\\/url>/g,
+    ""
+  );
+
+  if (cleaned !== xml) {
+    fs.writeFileSync(sitemapPath, cleaned, "utf8");
+    console.log("[remove-dev-routes] removed dev routes from sitemap-0.xml");
+  }
+}
+`,
+  ],
+]);
+
+function normalizeRelativePath(relativePath) {
+  return relativePath.replaceAll("\\", "/");
+}
+
+function getFallbackPayloadContents(sourceRelativePath, targetRelativePath) {
+  return (
+    FALLBACK_PAYLOAD_CONTENTS.get(normalizeRelativePath(sourceRelativePath)) ??
+    FALLBACK_PAYLOAD_CONTENTS.get(normalizeRelativePath(targetRelativePath)) ??
+    null
+  );
+}
+
 function ensureParentDirectory(filePath) {
   const parent = path.dirname(filePath);
   if (!existsSync(parent)) {
@@ -42,9 +88,31 @@ function ensureParentDirectory(filePath) {
 function copyPayloadFileIfMissing({ workspaceRoot, sourceRelativePath, targetRelativePath, log }) {
   const sourcePath = path.join(PAYLOAD_ROOT, sourceRelativePath);
   const targetPath = path.join(workspaceRoot, targetRelativePath);
+  const fallbackContents = getFallbackPayloadContents(
+    sourceRelativePath,
+    targetRelativePath
+  );
 
   if (!existsSync(sourcePath)) {
-    throw new Error(`Provisioning payload is missing "${sourceRelativePath}".`);
+    if (fallbackContents && !existsSync(targetPath)) {
+      ensureParentDirectory(targetPath);
+      writeFileSync(targetPath, fallbackContents, "utf8");
+      log(
+        `Provisioned missing file from embedded fallback: ${targetRelativePath}`
+      );
+      return { action: "created", targetRelativePath };
+    }
+
+    if (existsSync(targetPath)) {
+      log(
+        `Payload missing "${sourceRelativePath}", but target already exists. Skipping ${targetRelativePath}.`
+      );
+      return { action: "skipped", targetRelativePath };
+    }
+
+    throw new Error(
+      `Provisioning payload is missing "${sourceRelativePath}", and target "${targetRelativePath}" does not exist.`
+    );
   }
 
   if (existsSync(targetPath)) {
@@ -76,7 +144,40 @@ function writeProvisionState({ workspaceRoot, summary, log }) {
 
 export function provisionWorkspaceFromPayload({ workspaceRoot, log = () => {} }) {
   if (!existsSync(PAYLOAD_ROOT)) {
-    throw new Error(`Provision payload root not found at "${PAYLOAD_ROOT}".`);
+    let created = 0;
+    let skipped = 0;
+    const missingTargets = [];
+
+    for (const entry of PAYLOAD_ENTRIES) {
+      const targetPath = path.join(workspaceRoot, entry.target);
+      if (existsSync(targetPath)) {
+        skipped += 1;
+        continue;
+      }
+
+      const fallbackContents = getFallbackPayloadContents(entry.source, entry.target);
+      if (!fallbackContents) {
+        missingTargets.push(entry.target);
+        continue;
+      }
+
+      ensureParentDirectory(targetPath);
+      writeFileSync(targetPath, fallbackContents, "utf8");
+      created += 1;
+      log(`Provisioned missing file from embedded fallback: ${entry.target}`);
+    }
+
+    if (missingTargets.length) {
+      throw new Error(
+        `Provision payload root not found at "${PAYLOAD_ROOT}", and required files are missing: ${missingTargets.join(", ")}`
+      );
+    }
+
+    const summary = { created, skipped };
+    writeProvisionState({ workspaceRoot, summary, log });
+    log(`Provision payload root missing, but fallback provisioning succeeded.`);
+    log(`Provisioning summary: created=${String(created)} skipped=${String(skipped)}`);
+    return summary;
   }
 
   let created = 0;
@@ -112,4 +213,3 @@ export function provisionWorkspaceFromPayload({ workspaceRoot, log = () => {} })
   log(`Provisioning summary: created=${String(created)} skipped=${String(skipped)}`);
   return summary;
 }
-

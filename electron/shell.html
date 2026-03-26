@@ -464,6 +464,21 @@
         const messageOrigin = editorOrigin ?? siteOrigin ?? "*";
         let frameThemeObserver = null;
         let observedThemeDocument = null;
+        let frameUiObserver = null;
+        let observedUiDocument = null;
+        const FRAME_HIDE_STYLE_ID = "dcx-hide-astro-dev-toolbar";
+        const FRAME_HIDE_CSS = `
+          astro-dev-toolbar,
+          astro-dev-toolbar-window,
+          astro-dev-toolbar-app,
+          [data-astro-dev-toolbar],
+          [id*="astro-dev-toolbar"] {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+          }
+        `;
 
         if (frame) frame.src = editorUrl;
 
@@ -557,6 +572,77 @@
           syncThemeFromFrame();
         };
 
+        const hideAstroDevToolbarInDocument = doc => {
+          if (!doc) return;
+          const root = doc.documentElement;
+          if (!root) return;
+
+          let styleEl = doc.getElementById(FRAME_HIDE_STYLE_ID);
+          if (!styleEl) {
+            styleEl = doc.createElement("style");
+            styleEl.id = FRAME_HIDE_STYLE_ID;
+            styleEl.textContent = FRAME_HIDE_CSS;
+            (doc.head || root).appendChild(styleEl);
+          }
+
+          doc
+            .querySelectorAll(
+              "astro-dev-toolbar, astro-dev-toolbar-window, astro-dev-toolbar-app, [data-astro-dev-toolbar], [id*='astro-dev-toolbar']"
+            )
+            .forEach(node => {
+              node.style.display = "none";
+            });
+        };
+
+        const hideAstroDevToolbarInFrameTree = () => {
+          if (!frame) return;
+          try {
+            const topDoc = frame.contentDocument;
+            if (!topDoc) return;
+            hideAstroDevToolbarInDocument(topDoc);
+            topDoc.querySelectorAll("iframe").forEach(innerFrame => {
+              try {
+                hideAstroDevToolbarInDocument(innerFrame.contentDocument);
+              } catch {
+                // Ignore cross-origin iframes.
+              }
+            });
+          } catch {
+            // Ignore frame access errors during navigation.
+          }
+        };
+
+        const bindFrameUiObserver = () => {
+          if (!frame) return;
+          let frameDoc = null;
+          try {
+            frameDoc = frame.contentDocument;
+          } catch {
+            return;
+          }
+          if (!frameDoc || frameDoc === observedUiDocument) return;
+          observedUiDocument = frameDoc;
+
+          if (frameUiObserver) {
+            frameUiObserver.disconnect();
+            frameUiObserver = null;
+          }
+
+          const root = frameDoc.documentElement;
+          if (!root) return;
+
+          frameUiObserver = new MutationObserver(() => {
+            hideAstroDevToolbarInFrameTree();
+          });
+
+          frameUiObserver.observe(root, {
+            childList: true,
+            subtree: true,
+          });
+
+          hideAstroDevToolbarInFrameTree();
+        };
+
         const callWindowControl = fnName => {
           const fn = api && api[fnName];
           if (typeof fn !== "function") {
@@ -621,7 +707,9 @@
         frame?.addEventListener("load", () => {
           requestThemeFromEditor();
           bindFrameThemeObserver();
+          bindFrameUiObserver();
           syncThemeFromFrame();
+          hideAstroDevToolbarInFrameTree();
         });
 
         const runBuild = () => {
@@ -723,12 +811,15 @@
 
         const themeSyncTimer = window.setInterval(() => {
           bindFrameThemeObserver();
+          bindFrameUiObserver();
           syncThemeFromFrame();
+          hideAstroDevToolbarInFrameTree();
         }, 1200);
 
         window.addEventListener("beforeunload", () => {
           window.clearInterval(themeSyncTimer);
           if (frameThemeObserver) frameThemeObserver.disconnect();
+          if (frameUiObserver) frameUiObserver.disconnect();
         });
 
         log("Companion shell initialized.");

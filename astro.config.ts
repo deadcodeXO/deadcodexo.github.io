@@ -15,13 +15,28 @@ import { SITE } from "./src/config";
 // https://astro.build/config
 export default defineConfig({
   site: SITE.website,
-  devtools: { enabled: false },
   integrations: [
     mdx({
       extendMarkdownConfig: true,
     }),
     sitemap({
-      filter: page => SITE.showArchives || !page.endsWith("/archives"),
+      filter: page => {
+        const normalized = page.endsWith("/") ? page.slice(0, -1) : page;
+
+        if (
+          normalized.endsWith("/admin") ||
+          normalized.endsWith("/editor") ||
+          normalized.endsWith("/edit")
+        ) {
+          return false;
+        }
+
+        if (!SITE.showArchives && normalized.endsWith("/archives")) {
+          return false;
+        }
+
+        return true;
+      },
     }),
   ],
   markdown: {

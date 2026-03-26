@@ -15,9 +15,6 @@ const DEV_SERVER_PORT = 4321;               // Astro dev server port
 const DEV_SERVER_URL = `http://${DEV_SERVER_HOST}:${DEV_SERVER_PORT}`; // Astro URL
 
 const DEFAULT_DECAP_PORT = 8081;            // Default Decap CMS proxy port
-const DECAP_PROXY_PORT = 8081;              // Decap CMS proxy port
-const DECAP_PROXY_URL = `http://${DEV_SERVER_HOST}:${DECAP_PROXY_PORT}`; // Decap editor URL
-
 const MAX_DECAP_PORT = 8199;                // Optional upper bound if auto-incrementing ports
 
 let mainWindow = null;
@@ -59,6 +56,13 @@ function sendReadyProdEvent(payload) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("readyprod-event", payload);
   }
+}
+
+function setSplashProgress(percent) {
+  if (!splashWindow || splashWindow.isDestroyed()) return;
+  splashWindow.webContents
+    .executeJavaScript(`setProgress(${String(percent)})`)
+    .catch(error => appendStartupLog(`Splash progress ${String(percent)} error: ${error.message}`));
 }
 
 function runReadyProdProcess() {
@@ -193,6 +197,7 @@ ipcMain.handle("show-notification", async (_, title, body) => {
       body,
       silent: false,
     });
+    notification.show();
     // Keep reference to prevent garbage collection
     if (!global.notifications) global.notifications = [];
     global.notifications.push(notification);
@@ -286,11 +291,7 @@ function createSplashWindow() {
   });
 
   splashWindow.loadFile(path.join(__dirname, "splash.html"));
-  try {
-    splashWindow.webContents.executeJavaScript('setProgress(10)');
-  } catch (error) {
-    appendStartupLog(`Splash progress init error: ${error.message}`);
-  }
+  setSplashProgress(10);
 }
 
 function createMainWindow() {
@@ -304,16 +305,25 @@ function createMainWindow() {
     autoHideMenuBar: true,
     backgroundColor: "#10131a",
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
       worldSafeExecuteJavaScript: true,
     },
   });
 
-  appendStartupLog(`Preload path: ${path.join(__dirname, "preload.js")}`);
-  appendStartupLog(`Loading main window URL: ${DEV_SERVER_URL}/editor`);
-  mainWindow.loadURL(`${DEV_SERVER_URL}/editor`);
+  const editorUrl = new URL("/editor", DEV_SERVER_URL);
+  editorUrl.searchParams.set("cms_proxy_port", String(decapServerPort));
+  const shellPath = path.join(__dirname, "shell.html");
+  appendStartupLog(`Preload path: ${path.join(__dirname, "preload.cjs")}`);
+  appendStartupLog(`Loading main window shell: ${shellPath}`);
+  appendStartupLog(`Editor target URL: ${editorUrl.toString()}`);
+  mainWindow.loadFile(shellPath, {
+    query: {
+      editorUrl: editorUrl.toString(),
+      siteUrl: DEV_SERVER_URL,
+    },
+  });
 
   let revealed = false;
   const revealWindow = () => {
@@ -499,7 +509,6 @@ async function startCmsServer() {
 async function waitForCmsServer(earlyExitPromise) {
   const serverReadyPromise = (async () => {
     const timeoutMs = 120000;
-    const intervalMs = 300;
     const deadline = Date.now() + timeoutMs;
     let ready = false;
 
@@ -509,11 +518,7 @@ async function waitForCmsServer(earlyExitPromise) {
         appendStartupLog(`[decap] probe response: ${response.status}`);
         if (response.ok) {
           appendStartupLog(`[decap] CMS ready (${response.status})`);
-          try {
-            splashWindow.webContents.executeJavaScript('setProgress(100)');
-          } catch (error) {
-            appendStartupLog(`Splash progress 100 error: ${error.message}`);
-          }
+          setSplashProgress(100);
           ready = true;
           break;
         }
@@ -560,19 +565,11 @@ app.whenReady().then(async () => {
     appendStartupLog(
       `PORTABLE_EXECUTABLE_DIR: ${process.env.PORTABLE_EXECUTABLE_DIR ?? "(not set)"}`
     );
-    try {
-      splashWindow.webContents.executeJavaScript('setProgress(20)');
-    } catch (error) {
-      appendStartupLog(`Splash progress 20 error: ${error.message}`);
-    }
     createSplashWindow();
+    setSplashProgress(20);
 
     const earlyExitPromise = startCmsServer();
-    try {
-      splashWindow.webContents.executeJavaScript('setProgress(50)');
-    } catch (error) {
-      appendStartupLog(`Splash progress 50 error: ${error.message}`);
-    }
+    setSplashProgress(50);
     await waitForCmsServer(earlyExitPromise);
     createMainWindow();
     createAppMenu();

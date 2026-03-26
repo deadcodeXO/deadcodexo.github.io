@@ -11,3 +11,17 @@ for (const route of devOnlyRoutes) {
     console.log(`[remove-dev-routes] removed ${routePath}`);
   }
 }
+
+const sitemapPath = path.join(distDir, "sitemap-0.xml");
+if (fs.existsSync(sitemapPath)) {
+  const xml = fs.readFileSync(sitemapPath, "utf8");
+  const cleaned = xml.replace(
+    /<url><loc>[^<]*\/(?:editor|edit|admin)\/?<\/loc><\/url>/g,
+    ""
+  );
+
+  if (cleaned !== xml) {
+    fs.writeFileSync(sitemapPath, cleaned, "utf8");
+    console.log("[remove-dev-routes] removed dev routes from sitemap-0.xml");
+  }
+}

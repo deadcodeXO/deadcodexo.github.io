@@ -24,6 +24,8 @@ try {
       ipcRenderer.invoke("workspace-read-file", relativePath),
     writeWorkspaceFile: (relativePath, contents) =>
       ipcRenderer.invoke("workspace-write-file", relativePath, contents),
+    deleteWorkspaceFile: relativePath =>
+      ipcRenderer.invoke("workspace-delete-file", relativePath),
     getWorkspaceMonacoBaseUrl: () =>
       ipcRenderer.invoke("workspace-monaco-base-url"),
     onRefreshCms: callback => {

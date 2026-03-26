@@ -7,6 +7,7 @@ import {
   readFileSync,
   readdirSync,
   statSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import net from "node:net";
@@ -41,10 +42,14 @@ const WORKSPACE_IGNORED_FILES = new Set([
   "pnpm-lock.yaml",
   "yarn.lock",
 ]);
-const WORKSPACE_TEXT_EXTENSIONS = new Set([
+const WORKSPACE_KNOWN_TEXT_EXTENSIONS = new Set([
   ".astro",
   ".md",
+  ".md2",
   ".mdx",
+  ".markdown",
+  ".mdown",
+  ".mkd",
   ".txt",
   ".json",
   ".jsonc",
@@ -76,6 +81,62 @@ const WORKSPACE_TEXT_EXTENSIONS = new Set([
   ".dockerignore",
   ".eslintignore",
   ".editorconfig",
+]);
+const WORKSPACE_BLOCKED_BINARY_EXTENSIONS = new Set([
+  ".a",
+  ".7z",
+  ".avi",
+  ".bin",
+  ".bmp",
+  ".class",
+  ".db",
+  ".db3",
+  ".dll",
+  ".dmg",
+  ".doc",
+  ".docx",
+  ".eot",
+  ".exe",
+  ".flac",
+  ".gif",
+  ".gz",
+  ".ico",
+  ".iso",
+  ".jar",
+  ".jpeg",
+  ".jpg",
+  ".lib",
+  ".lockb",
+  ".m4a",
+  ".mov",
+  ".mp3",
+  ".mp4",
+  ".o",
+  ".obj",
+  ".otf",
+  ".pdf",
+  ".png",
+  ".ppt",
+  ".pptx",
+  ".pyc",
+  ".rar",
+  ".so",
+  ".sqlite",
+  ".sqlite3",
+  ".tar",
+  ".tif",
+  ".tiff",
+  ".ttf",
+  ".wasm",
+  ".wav",
+  ".webm",
+  ".webp",
+  ".woff",
+  ".woff2",
+  ".xls",
+  ".xlsx",
+  ".xz",
+  ".zip",
 ]);
 
 let mainWindow = null;
@@ -122,16 +183,27 @@ function resolveWorkspacePath(relativePath) {
   return resolved;
 }
 
-function isTextWorkspaceFile(fileName) {
+function getWorkspaceFileExtension(fileName) {
+  return path.extname(fileName.toLowerCase());
+}
+
+function isBlockedWorkspaceBinaryFile(fileName) {
+  const base = fileName.toLowerCase();
+  const extension = getWorkspaceFileExtension(base);
+  return Boolean(extension && WORKSPACE_BLOCKED_BINARY_EXTENSIONS.has(extension));
+}
+
+function isWorkspaceEditorFile(fileName) {
   const base = fileName.toLowerCase();
   if (WORKSPACE_IGNORED_FILES.has(base)) return false;
+  return !isBlockedWorkspaceBinaryFile(base);
+}
 
-  const extension = path.extname(base);
-  if (!extension) {
-    return true;
-  }
-
-  return WORKSPACE_TEXT_EXTENSIONS.has(extension);
+function isKnownTextWorkspaceFile(fileName) {
+  const base = fileName.toLowerCase();
+  const extension = getWorkspaceFileExtension(base);
+  if (!extension) return true;
+  return WORKSPACE_KNOWN_TEXT_EXTENSIONS.has(extension);
 }
 
 function listWorkspaceFiles() {
@@ -159,7 +231,7 @@ function listWorkspaceFiles() {
       }
 
       if (!entry.isFile()) continue;
-      if (!isTextWorkspaceFile(entry.name)) continue;
+      if (!isWorkspaceEditorFile(entry.name)) continue;
 
       files.push(toPosixPath(relativePath));
       if (files.length >= MAX_WORKSPACE_FILES) return;
@@ -414,7 +486,18 @@ ipcMain.handle("workspace-list-files", () => {
 
 ipcMain.handle("workspace-read-file", (_event, relativePath) => {
   const absolutePath = resolveWorkspacePath(relativePath);
-  const fileStat = statSync(absolutePath);
+  let fileStat = null;
+  try {
+    fileStat = statSync(absolutePath);
+  } catch (error) {
+    if (error?.code === "ENOENT" || error?.code === "ENOTDIR") {
+      return {
+        path: toPosixPath(relativePath),
+        missing: true,
+      };
+    }
+    throw error;
+  }
   if (!fileStat.isFile()) {
     throw new Error(`Not a file: ${relativePath}`);
   }
@@ -431,6 +514,7 @@ ipcMain.handle("workspace-read-file", (_event, relativePath) => {
     contents,
     size: fileStat.size,
     mtimeMs: fileStat.mtimeMs,
+    missing: false,
   };
 });
 
@@ -440,8 +524,11 @@ ipcMain.handle("workspace-write-file", (_event, relativePath, contents) => {
   }
 
   const absolutePath = resolveWorkspacePath(relativePath);
-  if (!isTextWorkspaceFile(path.basename(absolutePath))) {
-    throw new Error(`This file type is not writable in the in-app editor: ${relativePath}`);
+  const baseName = path.basename(absolutePath);
+  if (isBlockedWorkspaceBinaryFile(baseName)) {
+    throw new Error(
+      `Blocked potentially binary file type in the in-app editor: ${relativePath}`
+    );
   }
 
   mkdirSync(path.dirname(absolutePath), { recursive: true });
@@ -452,6 +539,32 @@ ipcMain.handle("workspace-write-file", (_event, relativePath, contents) => {
     path: toPosixPath(relativePath),
     size: updatedStat.size,
     mtimeMs: updatedStat.mtimeMs,
+    knownTextType: isKnownTextWorkspaceFile(baseName),
+  };
+});
+
+ipcMain.handle("workspace-delete-file", (_event, relativePath) => {
+  const absolutePath = resolveWorkspacePath(relativePath);
+  let fileStat = null;
+  try {
+    fileStat = statSync(absolutePath);
+  } catch (error) {
+    if (error?.code === "ENOENT" || error?.code === "ENOTDIR") {
+      return {
+        path: toPosixPath(relativePath),
+        missing: true,
+      };
+    }
+    throw error;
+  }
+  if (!fileStat.isFile()) {
+    throw new Error(`Not a file: ${relativePath}`);
+  }
+
+  unlinkSync(absolutePath);
+  return {
+    path: toPosixPath(relativePath),
+    missing: false,
   };
 });
 

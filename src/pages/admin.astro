@@ -272,29 +272,88 @@
               if (!doc) return;
 
               let styleEl = doc.getElementById("dcx-preview-theme");
-              if (!isDarkTheme()) {
-                if (styleEl) styleEl.remove();
-                return;
-              }
-
               if (!styleEl) {
                 styleEl = doc.createElement("style");
                 styleEl.id = "dcx-preview-theme";
                 (doc.head || doc.documentElement).appendChild(styleEl);
               }
 
-              styleEl.textContent = `
-                html, body {
-                  background: #161b24 !important;
-                  color: #eaf3ff !important;
-                }
-                h1, h2, h3, h4, h5, h6, p, li, span, strong, em {
-                  color: #c8e6ff !important;
-                }
-                a {
-                  color: #53b0ff !important;
-                }
-              `;
+              const dark = isDarkTheme();
+              styleEl.textContent = dark
+                ? `
+                    html, body {
+                      background: #161b24 !important;
+                      color: #eaf3ff !important;
+                      scrollbar-width: auto;
+                      scrollbar-color: rgba(120, 152, 214, 0.55) transparent;
+                    }
+                    html, body, * {
+                      scrollbar-width: auto;
+                      scrollbar-color: rgba(120, 152, 214, 0.55) transparent;
+                    }
+                    h1, h2, h3, h4, h5, h6, p, li, span, strong, em {
+                      color: #c8e6ff !important;
+                    }
+                    a {
+                      color: #53b0ff !important;
+                    }
+                    ::-webkit-scrollbar {
+                      width: 12px;
+                      height: 12px;
+                    }
+                    ::-webkit-scrollbar-track {
+                      background: transparent;
+                    }
+                    ::-webkit-scrollbar-thumb {
+                      border: 3px solid transparent;
+                      border-radius: 10px;
+                      background: linear-gradient(
+                        180deg,
+                        rgba(117, 154, 226, 0.92),
+                        rgba(73, 113, 190, 0.9)
+                      );
+                      background-clip: padding-box;
+                    }
+                    ::-webkit-scrollbar-thumb:hover {
+                      background: linear-gradient(
+                        180deg,
+                        rgba(130, 168, 240, 0.96),
+                        rgba(84, 124, 203, 0.94)
+                      );
+                      background-clip: padding-box;
+                    }
+                  `
+                : `
+                    html, body, * {
+                      scrollbar-width: auto;
+                      scrollbar-color: rgba(136, 154, 186, 0.72) transparent;
+                    }
+                    ::-webkit-scrollbar {
+                      width: 12px;
+                      height: 12px;
+                    }
+                    ::-webkit-scrollbar-track {
+                      background: transparent;
+                    }
+                    ::-webkit-scrollbar-thumb {
+                      border: 3px solid transparent;
+                      border-radius: 10px;
+                      background: linear-gradient(
+                        180deg,
+                        rgba(198, 209, 228, 0.95),
+                        rgba(172, 186, 211, 0.9)
+                      );
+                      background-clip: padding-box;
+                    }
+                    ::-webkit-scrollbar-thumb:hover {
+                      background: linear-gradient(
+                        180deg,
+                        rgba(208, 220, 238, 0.98),
+                        rgba(185, 199, 224, 0.96)
+                      );
+                      background-clip: padding-box;
+                    }
+                  `;
             } catch {
               // Cross-origin or inaccessible iframe; ignore.
             }

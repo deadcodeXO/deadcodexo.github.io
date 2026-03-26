@@ -6,6 +6,8 @@
   const api = window.electronAPI;
   const frame = document.getElementById("editor-frame");
   const buildBtn = document.getElementById("build-btn");
+  const toggleEditorBtn = document.getElementById("toggle-editor-btn");
+  const toggleConsoleBtn = document.getElementById("toggle-console-btn");
   const buildStatus = document.getElementById("build-status");
   const consoleBody = document.getElementById("console-body");
   const consoleEl = document.getElementById("console");
@@ -14,6 +16,11 @@
   const editorStatus = document.getElementById("editor-status");
   const currentFileLabel = document.getElementById("current-file-label");
   const saveFileBtn = document.getElementById("save-file-btn");
+  const saveAsFileBtn = document.getElementById("save-as-file-btn");
+  const undoFileBtn = document.getElementById("undo-file-btn");
+  const redoFileBtn = document.getElementById("redo-file-btn");
+  const deleteFileBtn = document.getElementById("delete-file-btn");
+  const newFileBtn = document.getElementById("new-file-btn");
   const refreshFilesBtn = document.getElementById("refresh-files-btn");
   const fileFilterInput = document.getElementById("file-filter-input");
   const fileListEl = document.getElementById("file-list");
@@ -22,6 +29,17 @@
   const monacoHost = document.getElementById("monaco-host");
   const workspaceMain = document.getElementById("workspace-main");
   const workspaceResizer = document.getElementById("workspace-resizer");
+  const confirmOverlay = document.getElementById("confirm-overlay");
+  const confirmTitle = document.getElementById("confirm-title");
+  const confirmBody = document.getElementById("confirm-body");
+  const confirmOkBtn = document.getElementById("confirm-ok-btn");
+  const confirmCancelBtn = document.getElementById("confirm-cancel-btn");
+  const pathModalOverlay = document.getElementById("path-modal-overlay");
+  const pathModalTitle = document.getElementById("path-modal-title");
+  const pathModalBody = document.getElementById("path-modal-body");
+  const pathModalInput = document.getElementById("path-modal-input");
+  const pathModalOkBtn = document.getElementById("path-modal-ok-btn");
+  const pathModalCancelBtn = document.getElementById("path-modal-cancel-btn");
 
   const editorOrigin = (() => {
     try {
@@ -42,6 +60,8 @@
   const messageOrigin = editorOrigin ?? siteOrigin ?? "*";
   const CODE_PANE_WIDTH_KEY = "dcx-code-pane-width";
   const LAST_OPEN_FILE_KEY = "dcx-last-open-file";
+  const EDITOR_VISIBLE_KEY = "dcx-editor-visible";
+  const CONSOLE_VISIBLE_KEY = "dcx-console-visible";
   const FRAME_HIDE_STYLE_ID = "dcx-hide-astro-dev-toolbar";
   const FRAME_HIDE_CSS = `
     astro-dev-toolbar,
@@ -71,9 +91,110 @@
   let monacoEditor = null;
   let activeEditorMode = "none";
   let monacoFailureLogged = false;
+  let editorVisible = true;
+  let consoleVisible = true;
+  let pendingConfirmResolve = null;
+  let pendingPathModalResolve = null;
+  let saveAsInProgress = false;
   let currentTheme = "dark";
   const expandedDirs = new Set([""]);
   const loadedScriptUrls = new Set();
+  const plainUndoStack = [];
+  const plainRedoStack = [];
+  const unknownWriteApprovalPaths = new Set();
+  let applyingPlainHistory = false;
+  let applyingMonacoProgrammaticChange = false;
+  const KNOWN_TEXT_EXTENSIONS = new Set([
+    ".astro",
+    ".md",
+    ".md2",
+    ".mdx",
+    ".markdown",
+    ".mdown",
+    ".mkd",
+    ".txt",
+    ".json",
+    ".jsonc",
+    ".js",
+    ".jsx",
+    ".mjs",
+    ".cjs",
+    ".ts",
+    ".tsx",
+    ".css",
+    ".scss",
+    ".sass",
+    ".less",
+    ".html",
+    ".yml",
+    ".yaml",
+    ".toml",
+    ".xml",
+    ".svg",
+    ".sh",
+    ".ps1",
+    ".bat",
+    ".cmd",
+    ".env",
+    ".ini",
+    ".conf",
+  ]);
+  const BLOCKED_BINARY_EXTENSIONS = new Set([
+    ".a",
+    ".7z",
+    ".avi",
+    ".bin",
+    ".bmp",
+    ".class",
+    ".db",
+    ".db3",
+    ".dll",
+    ".dmg",
+    ".doc",
+    ".docx",
+    ".eot",
+    ".exe",
+    ".flac",
+    ".gif",
+    ".gz",
+    ".ico",
+    ".iso",
+    ".jar",
+    ".jpeg",
+    ".jpg",
+    ".lib",
+    ".lockb",
+    ".m4a",
+    ".mov",
+    ".mp3",
+    ".mp4",
+    ".o",
+    ".obj",
+    ".otf",
+    ".pdf",
+    ".png",
+    ".ppt",
+    ".pptx",
+    ".pyc",
+    ".rar",
+    ".so",
+    ".sqlite",
+    ".sqlite3",
+    ".tar",
+    ".tif",
+    ".tiff",
+    ".ttf",
+    ".wasm",
+    ".wav",
+    ".webm",
+    ".webp",
+    ".woff",
+    ".woff2",
+    ".xls",
+    ".xlsx",
+    ".xz",
+    ".zip",
+  ]);
 
   if (frame) frame.src = editorUrl;
 
@@ -102,6 +223,37 @@
     if (editorStatus) editorStatus.textContent = text;
   };
 
+  const setEditorPaneVisible = visible => {
+    editorVisible = Boolean(visible);
+    workspaceMain?.classList.toggle("editor-hidden", !editorVisible);
+    if (toggleEditorBtn) {
+      toggleEditorBtn.classList.toggle("active", editorVisible);
+      toggleEditorBtn.title = editorVisible ? "Hide editor" : "Show editor";
+      toggleEditorBtn.setAttribute(
+        "aria-label",
+        editorVisible ? "Hide code editor pane" : "Show code editor pane"
+      );
+    }
+    window.localStorage.setItem(EDITOR_VISIBLE_KEY, editorVisible ? "1" : "0");
+    if (monacoEditor) {
+      window.requestAnimationFrame(() => monacoEditor.layout());
+    }
+  };
+
+  const setConsolePaneVisible = visible => {
+    consoleVisible = Boolean(visible);
+    consoleEl?.classList.toggle("minimized", !consoleVisible);
+    if (toggleConsoleBtn) {
+      toggleConsoleBtn.classList.toggle("active", consoleVisible);
+      toggleConsoleBtn.title = consoleVisible ? "Hide console" : "Show console";
+      toggleConsoleBtn.setAttribute(
+        "aria-label",
+        consoleVisible ? "Hide console panel" : "Show console panel"
+      );
+    }
+    window.localStorage.setItem(CONSOLE_VISIBLE_KEY, consoleVisible ? "1" : "0");
+  };
+
   const updateCurrentFileLabel = () => {
     if (!currentFileLabel) return;
     if (!activeFilePath) {
@@ -113,9 +265,45 @@
 
   const updateSaveButtonState = () => {
     if (!saveFileBtn) return;
-    saveFileBtn.disabled = !activeFilePath || saveInProgress;
+    const canEdit = Boolean(activeFilePath) && activeEditorMode !== "none";
+    const isBusy = saveInProgress || saveAsInProgress;
+    const canUndoPlain = activeEditorMode === "plain" && plainUndoStack.length > 1;
+    const canRedoPlain = activeEditorMode === "plain" && plainRedoStack.length > 0;
+    const canUndo = activeEditorMode === "plain" ? canUndoPlain : canEdit;
+    const canRedo = activeEditorMode === "plain" ? canRedoPlain : canEdit;
+    saveFileBtn.disabled = !canEdit || isBusy;
     saveFileBtn.style.opacity = saveFileBtn.disabled ? "0.5" : "1";
     saveFileBtn.style.cursor = saveFileBtn.disabled ? "default" : "pointer";
+
+    if (saveAsFileBtn) {
+      saveAsFileBtn.disabled = activeEditorMode === "none" || isBusy;
+      saveAsFileBtn.style.opacity = saveAsFileBtn.disabled ? "0.5" : "1";
+      saveAsFileBtn.style.cursor = saveAsFileBtn.disabled ? "default" : "pointer";
+    }
+
+    if (undoFileBtn) {
+      undoFileBtn.disabled = !canUndo || isBusy;
+      undoFileBtn.style.opacity = undoFileBtn.disabled ? "0.5" : "1";
+      undoFileBtn.style.cursor = undoFileBtn.disabled ? "default" : "pointer";
+    }
+
+    if (redoFileBtn) {
+      redoFileBtn.disabled = !canRedo || isBusy;
+      redoFileBtn.style.opacity = redoFileBtn.disabled ? "0.5" : "1";
+      redoFileBtn.style.cursor = redoFileBtn.disabled ? "default" : "pointer";
+    }
+
+    if (deleteFileBtn) {
+      deleteFileBtn.disabled = !activeFilePath || isBusy;
+      deleteFileBtn.style.opacity = deleteFileBtn.disabled ? "0.5" : "1";
+      deleteFileBtn.style.cursor = deleteFileBtn.disabled ? "default" : "pointer";
+    }
+
+    if (newFileBtn) {
+      newFileBtn.disabled = isBusy;
+      newFileBtn.style.opacity = newFileBtn.disabled ? "0.5" : "1";
+      newFileBtn.style.cursor = newFileBtn.disabled ? "default" : "pointer";
+    }
   };
 
   const reloadFrame = () => {
@@ -343,7 +531,14 @@
     }
     setMonacoVisibility(mode === "monaco");
     setEditorEmptyState(mode === "none");
+    updateSaveButtonState();
   };
+
+  const normalizeEditorText = value =>
+    typeof value === "string" ? value.replace(/\r\n/g, "\n") : "";
+
+  const isValueDirty = (currentValue, savedValue) =>
+    normalizeEditorText(currentValue) !== normalizeEditorText(savedValue);
 
   const getCurrentEditorValue = () => {
     if (activeEditorMode === "monaco" && monacoEditor) {
@@ -355,14 +550,238 @@
     return "";
   };
 
-  plainEditor?.addEventListener("input", () => {
-    if (activeEditorMode !== "plain" || !activeFilePath) return;
-    const nextDirty = plainEditor.value !== lastSavedContents;
-    if (nextDirty === isDirty) return;
-    isDirty = nextDirty;
-    updateCurrentFileLabel();
+  const showConfirmModal = ({
+    title,
+    body,
+    okLabel = "Confirm",
+    danger = false,
+  }) => {
+    if (!confirmOverlay || !confirmTitle || !confirmBody || !confirmOkBtn || !confirmCancelBtn) {
+      return Promise.resolve(window.confirm(body || "Are you sure?"));
+    }
+
+    if (pendingConfirmResolve) {
+      pendingConfirmResolve(false);
+      pendingConfirmResolve = null;
+    }
+
+    confirmTitle.textContent = title || "Confirm";
+    confirmBody.textContent = body || "";
+    confirmOkBtn.textContent = okLabel;
+    confirmOkBtn.classList.toggle("danger", Boolean(danger));
+    confirmOverlay.classList.remove("hidden");
+    confirmOkBtn.focus();
+
+    return new Promise(resolve => {
+      pendingConfirmResolve = resolve;
+    });
+  };
+
+  const resolveConfirmModal = accepted => {
+    if (confirmOverlay) {
+      confirmOverlay.classList.add("hidden");
+    }
+
+    const resolver = pendingConfirmResolve;
+    pendingConfirmResolve = null;
+    if (resolver) resolver(Boolean(accepted));
+  };
+
+  const normalizeRelativePathInput = value => {
+    if (typeof value !== "string") return "";
+    return value
+      .trim()
+      .replaceAll("\\", "/")
+      .replace(/^\.\//, "")
+      .replace(/^\/+/, "")
+      .replace(/\/{2,}/g, "/");
+  };
+
+  const isUnsafeRelativePath = relativePath =>
+    !relativePath ||
+    relativePath.startsWith("..") ||
+    relativePath.includes("/../") ||
+    relativePath.endsWith("/..");
+
+  const suggestCopyPath = originalPath => {
+    if (!originalPath) return "";
+    const slashIndex = originalPath.lastIndexOf("/");
+    const dir = slashIndex >= 0 ? originalPath.slice(0, slashIndex + 1) : "";
+    const fileName = slashIndex >= 0 ? originalPath.slice(slashIndex + 1) : originalPath;
+    const dotIndex = fileName.lastIndexOf(".");
+    if (dotIndex > 0) {
+      return `${dir}${fileName.slice(0, dotIndex)}-copy${fileName.slice(dotIndex)}`;
+    }
+    return `${dir}${fileName}-copy`;
+  };
+
+  const getPathExtension = relativePath => {
+    if (typeof relativePath !== "string") return "";
+    const normalized = relativePath.replaceAll("\\", "/");
+    const fileName = normalized.split("/").pop() || normalized;
+    const dotIndex = fileName.lastIndexOf(".");
+    if (dotIndex <= 0) return "";
+    return fileName.slice(dotIndex).toLowerCase();
+  };
+
+  const getWriteTypeClassification = relativePath => {
+    const extension = getPathExtension(relativePath);
+    if (extension && BLOCKED_BINARY_EXTENSIONS.has(extension)) {
+      return { type: "blocked", extension };
+    }
+    if (!extension || KNOWN_TEXT_EXTENSIONS.has(extension)) {
+      return { type: "known", extension };
+    }
+    return { type: "unknown", extension };
+  };
+
+  const ensureWritableTypeWithWarning = async (relativePath, actionLabel) => {
+    const normalizedPath = normalizeRelativePathInput(relativePath);
+    const classification = getWriteTypeClassification(normalizedPath);
+
+    if (classification.type === "blocked") {
+      setEditorStatus(
+        `Blocked binary type (${classification.extension}) for ${actionLabel.toLowerCase()}`
+      );
+      log(
+        `Write blocked: ${normalizedPath} uses binary extension ${classification.extension}`
+      );
+      return false;
+    }
+
+    if (
+      classification.type === "unknown" &&
+      normalizedPath &&
+      !unknownWriteApprovalPaths.has(normalizedPath)
+    ) {
+      const accepted = await showConfirmModal({
+        title: "Unknown File Type",
+        body: `.${classification.extension.slice(1)} isn't a known text extension. ${actionLabel} this file anyway?`,
+        okLabel: actionLabel,
+      });
+      if (!accepted) return false;
+      unknownWriteApprovalPaths.add(normalizedPath);
+    }
+
+    return true;
+  };
+
+  const showPathModal = ({
+    title,
+    body,
+    okLabel = "OK",
+    suggestedPath = "",
+  }) => {
+    if (
+      !pathModalOverlay ||
+      !pathModalTitle ||
+      !pathModalBody ||
+      !pathModalInput ||
+      !pathModalOkBtn ||
+      !pathModalCancelBtn
+    ) {
+      const raw = window.prompt(title || "Enter file path", suggestedPath);
+      if (raw === null) return Promise.resolve({ accepted: false, value: "" });
+      return Promise.resolve({ accepted: true, value: normalizeRelativePathInput(raw) });
+    }
+
+    if (pendingPathModalResolve) {
+      pendingPathModalResolve({ accepted: false, value: "" });
+      pendingPathModalResolve = null;
+    }
+
+    pathModalTitle.textContent = title || "Enter File Path";
+    pathModalBody.textContent = body || "Use a path relative to repo root.";
+    pathModalOkBtn.textContent = okLabel;
+    pathModalInput.value = suggestedPath || "";
+    pathModalInput.classList.remove("invalid");
+    pathModalOverlay.classList.remove("hidden");
+    window.setTimeout(() => {
+      pathModalInput.focus();
+      pathModalInput.select();
+    }, 0);
+
+    return new Promise(resolve => {
+      pendingPathModalResolve = resolve;
+    });
+  };
+
+  const resolvePathModal = accepted => {
+    if (!pathModalOverlay || !pathModalInput) {
+      const resolver = pendingPathModalResolve;
+      pendingPathModalResolve = null;
+      if (resolver) resolver({ accepted: Boolean(accepted), value: "" });
+      return;
+    }
+
+    if (!accepted) {
+      pathModalOverlay.classList.add("hidden");
+      const resolver = pendingPathModalResolve;
+      pendingPathModalResolve = null;
+      if (resolver) resolver({ accepted: false, value: "" });
+      return;
+    }
+
+    const normalized = normalizeRelativePathInput(pathModalInput.value);
+    if (isUnsafeRelativePath(normalized)) {
+      pathModalInput.classList.add("invalid");
+      setEditorStatus("Invalid path. Use a repo-relative file path.");
+      pathModalInput.focus();
+      return;
+    }
+
+    pathModalInput.classList.remove("invalid");
+    pathModalOverlay.classList.add("hidden");
+    const resolver = pendingPathModalResolve;
+    pendingPathModalResolve = null;
+    if (resolver) resolver({ accepted: true, value: normalized });
+  };
+
+  const pushPlainUndoState = () => {
+    if (!plainEditor || applyingPlainHistory) return;
+    const value = plainEditor.value;
+    if (plainUndoStack.length && plainUndoStack[plainUndoStack.length - 1] === value) return;
+    plainUndoStack.push(value);
+    if (plainUndoStack.length > 300) plainUndoStack.shift();
+  };
+
+  const resetPlainHistory = () => {
+    plainUndoStack.length = 0;
+    plainRedoStack.length = 0;
+    if (plainEditor) {
+      plainUndoStack.push(plainEditor.value);
+    }
     updateSaveButtonState();
-    renderWorkspaceFiles();
+  };
+
+  const applyPlainHistoryValue = value => {
+    if (!plainEditor) return;
+    applyingPlainHistory = true;
+    plainEditor.value = value;
+    applyingPlainHistory = false;
+    const nextDirty = isValueDirty(plainEditor.value, lastSavedContents);
+    if (nextDirty !== isDirty) {
+      isDirty = nextDirty;
+      updateCurrentFileLabel();
+      renderWorkspaceFiles();
+    }
+    updateSaveButtonState();
+    plainEditor.focus();
+  };
+
+  plainEditor?.addEventListener("input", () => {
+    if (activeEditorMode === "plain" && !applyingPlainHistory) {
+      pushPlainUndoState();
+      plainRedoStack.length = 0;
+    }
+    if (activeEditorMode !== "plain" || !activeFilePath) return;
+    const nextDirty = isValueDirty(plainEditor.value, lastSavedContents);
+    if (nextDirty !== isDirty) {
+      isDirty = nextDirty;
+      updateCurrentFileLabel();
+      renderWorkspaceFiles();
+    }
+    updateSaveButtonState();
   });
 
   const loadExternalScript = src => {
@@ -545,8 +964,9 @@
       });
 
       monacoEditor.onDidChangeModelContent(() => {
+        if (applyingMonacoProgrammaticChange) return;
         if (!activeFilePath) return;
-        const nextDirty = monacoEditor.getValue() !== lastSavedContents;
+        const nextDirty = isValueDirty(monacoEditor.getValue(), lastSavedContents);
         if (nextDirty === isDirty) return;
         isDirty = nextDirty;
         updateCurrentFileLabel();
@@ -555,7 +975,7 @@
       });
 
       applyMonacoTheme(currentTheme);
-      setMonacoVisibility(true);
+      setMonacoVisibility(activeEditorMode === "monaco");
       monacoFailureLogged = false;
     }
 
@@ -729,6 +1149,7 @@
         updateCurrentFileLabel();
         updateSaveButtonState();
         if (plainEditor) plainEditor.value = "";
+        resetPlainHistory();
         setEditorMode("none");
       }
     } catch (error) {
@@ -739,45 +1160,40 @@
 
   const openWorkspaceFile = async relativePath => {
     if (!relativePath || !api?.readWorkspaceFile) return;
-    if (
-      isDirty &&
-      activeFilePath &&
-      activeFilePath !== relativePath &&
-      !window.confirm("You have unsaved changes. Discard them and open another file?")
-    ) {
-      return;
+    if (activeFilePath && activeFilePath !== relativePath) {
+      const currentDirty = isValueDirty(getCurrentEditorValue(), lastSavedContents);
+      if (currentDirty !== isDirty) {
+        isDirty = currentDirty;
+        updateCurrentFileLabel();
+        updateSaveButtonState();
+        renderWorkspaceFiles();
+      }
+      if (currentDirty) {
+        const discard = await showConfirmModal({
+          title: "Unsaved Changes",
+          body: "You have unsaved changes. Discard them and open another file?",
+          okLabel: "Discard",
+          danger: true,
+        });
+        if (!discard) return;
+      }
     }
 
     setEditorStatus(`Opening ${relativePath}...`);
     try {
       const payload = await api.readWorkspaceFile(relativePath);
+      if (payload?.missing) {
+        throw new Error(`File not found: ${relativePath}`);
+      }
       const filePath = payload?.path || relativePath;
       const contents = payload?.contents || "";
       const language = getLanguageForPath(filePath);
-      let openedInMonaco = false;
 
-      try {
-        const editor = await ensureMonacoEditor();
-        editor.setValue(contents);
-        const model = editor.getModel();
-        if (model && monacoInstance?.editor?.setModelLanguage) {
-          monacoInstance.editor.setModelLanguage(model, language);
-        }
-        setEditorMode("monaco");
-        editor.focus();
-        openedInMonaco = true;
-      } catch (monacoError) {
-        if (!monacoFailureLogged) {
-          monacoFailureLogged = true;
-          log(`Monaco load warning: ${monacoError.message}`);
-          log("Using basic editor mode for now.");
-        }
-        if (!plainEditor) {
-          throw monacoError;
-        }
+      // Show content immediately in the lightweight fallback so first open never stalls.
+      if (plainEditor) {
         plainEditor.value = contents;
+        resetPlainHistory();
         setEditorMode("plain");
-        plainEditor.focus();
       }
 
       activeFilePath = filePath;
@@ -787,12 +1203,42 @@
       updateCurrentFileLabel();
       updateSaveButtonState();
       renderWorkspaceFiles();
-      setEditorStatus(
-        openedInMonaco
-          ? `${filePath} loaded`
-          : `${filePath} loaded (basic editor mode)`
-      );
+      setEditorStatus(`${filePath} loaded`);
       window.localStorage.setItem(LAST_OPEN_FILE_KEY, filePath);
+
+      ensureMonacoEditor()
+        .then(editor => {
+          if (activeFilePath !== filePath) return;
+          try {
+            applyingMonacoProgrammaticChange = true;
+            editor.setValue(contents);
+            const model = editor.getModel();
+            if (model && monacoInstance?.editor?.setModelLanguage) {
+              monacoInstance.editor.setModelLanguage(model, language);
+            }
+          } finally {
+            applyingMonacoProgrammaticChange = false;
+          }
+          isDirty = false;
+          updateCurrentFileLabel();
+          updateSaveButtonState();
+          renderWorkspaceFiles();
+          setEditorMode("monaco");
+          editor.focus();
+          monacoFailureLogged = false;
+        })
+        .catch(monacoError => {
+          applyingMonacoProgrammaticChange = false;
+          if (!monacoFailureLogged) {
+            monacoFailureLogged = true;
+            log(`Monaco load warning: ${monacoError.message}`);
+            log("Using basic editor mode for now.");
+          }
+          if (activeFilePath === filePath) {
+            setEditorMode("plain");
+            setEditorStatus(`${filePath} loaded (basic editor mode)`);
+          }
+        });
     } catch (error) {
       setEditorStatus("Failed to open file");
       log(`Open file failed: ${error.message}`);
@@ -803,10 +1249,16 @@
     if (!api?.writeWorkspaceFile || !activeFilePath) return;
     if (activeEditorMode === "none") return;
     const nextContents = getCurrentEditorValue();
-    if (nextContents === lastSavedContents) {
+    if (!isValueDirty(nextContents, lastSavedContents)) {
       setEditorStatus("No changes to save");
+      isDirty = false;
+      updateCurrentFileLabel();
+      updateSaveButtonState();
+      renderWorkspaceFiles();
       return;
     }
+    const allowedByType = await ensureWritableTypeWithWarning(activeFilePath, "Save");
+    if (!allowedByType) return;
 
     saveInProgress = true;
     updateSaveButtonState();
@@ -830,6 +1282,192 @@
     }
   };
 
+  const createNewFile = async () => {
+    if (!api?.writeWorkspaceFile || !api?.readWorkspaceFile) return;
+    const pathResult = await showPathModal({
+      title: "Create New File",
+      body: "Enter a new file path relative to the repository root.",
+      okLabel: "Create",
+      suggestedPath: "src/pages/new-page.astro",
+    });
+    if (!pathResult?.accepted || !pathResult.value) return;
+    const targetPath = pathResult.value;
+
+    let exists = false;
+    try {
+      const probe = await api.readWorkspaceFile(targetPath);
+      exists = !probe?.missing;
+    } catch {
+      exists = false;
+    }
+
+    if (exists) {
+      const overwrite = await showConfirmModal({
+        title: "Overwrite File?",
+        body: `"${targetPath}" already exists. Overwrite it?`,
+        okLabel: "Overwrite",
+      });
+      if (!overwrite) return;
+    }
+    const allowedByType = await ensureWritableTypeWithWarning(targetPath, "Create");
+    if (!allowedByType) return;
+
+    saveAsInProgress = true;
+    updateSaveButtonState();
+    setEditorStatus(`Creating ${targetPath}...`);
+
+    try {
+      await api.writeWorkspaceFile(targetPath, "");
+      await refreshWorkspaceFiles();
+      await openWorkspaceFile(targetPath);
+      setEditorStatus(`Created ${targetPath}`);
+      log(`Created ${targetPath}`);
+    } catch (error) {
+      setEditorStatus("Create file failed");
+      log(`Create file failed: ${error.message}`);
+    } finally {
+      saveAsInProgress = false;
+      updateSaveButtonState();
+    }
+  };
+
+  const saveCurrentFileAs = async () => {
+    if (!api?.writeWorkspaceFile || !api?.readWorkspaceFile || activeEditorMode === "none") return;
+
+    const suggestedPath = suggestCopyPath(activeFilePath || "src/pages/new-file.astro");
+    const pathResult = await showPathModal({
+      title: "Save File As",
+      body: "Enter the destination path relative to the repository root.",
+      okLabel: "Save As",
+      suggestedPath,
+    });
+    if (!pathResult?.accepted || !pathResult.value) return;
+    const targetPath = pathResult.value;
+
+    let exists = false;
+    try {
+      const probe = await api.readWorkspaceFile(targetPath);
+      exists = !probe?.missing;
+    } catch {
+      exists = false;
+    }
+
+    if (exists && targetPath !== activeFilePath) {
+      const overwrite = await showConfirmModal({
+        title: "Overwrite File?",
+        body: `"${targetPath}" already exists. Overwrite it?`,
+        okLabel: "Overwrite",
+      });
+      if (!overwrite) return;
+    }
+    const allowedByType = await ensureWritableTypeWithWarning(targetPath, "Save");
+    if (!allowedByType) return;
+
+    const nextContents = getCurrentEditorValue();
+    saveAsInProgress = true;
+    updateSaveButtonState();
+    setEditorStatus(`Saving as ${targetPath}...`);
+
+    try {
+      await api.writeWorkspaceFile(targetPath, nextContents);
+      await refreshWorkspaceFiles();
+      await openWorkspaceFile(targetPath);
+      setEditorStatus(`Saved as ${targetPath}`);
+      log(`Saved as ${targetPath}`);
+    } catch (error) {
+      setEditorStatus("Save as failed");
+      log(`Save as failed: ${error.message}`);
+    } finally {
+      saveAsInProgress = false;
+      updateSaveButtonState();
+    }
+  };
+
+  const runUndo = () => {
+    if (activeEditorMode === "monaco" && monacoEditor) {
+      monacoEditor.trigger("keyboard", "undo", null);
+      return;
+    }
+    if (activeEditorMode === "plain" && plainEditor) {
+      if (plainUndoStack.length <= 1) {
+        setEditorStatus("Nothing to undo");
+        return;
+      }
+      const current = plainUndoStack.pop();
+      if (typeof current === "string") {
+        plainRedoStack.push(current);
+      }
+      const previous = plainUndoStack[plainUndoStack.length - 1] || "";
+      applyPlainHistoryValue(previous);
+      setEditorStatus("Undo applied");
+    }
+  };
+
+  const runRedo = () => {
+    if (activeEditorMode === "monaco" && monacoEditor) {
+      monacoEditor.trigger("keyboard", "redo", null);
+      return;
+    }
+    if (activeEditorMode === "plain" && plainEditor) {
+      if (!plainRedoStack.length) {
+        setEditorStatus("Nothing to redo");
+        return;
+      }
+      const nextValue = plainRedoStack.pop();
+      if (typeof nextValue !== "string") return;
+      plainUndoStack.push(nextValue);
+      applyPlainHistoryValue(nextValue);
+      setEditorStatus("Redo applied");
+    }
+  };
+
+  const deleteCurrentFile = async () => {
+    if (!api?.deleteWorkspaceFile || !activeFilePath) return;
+    if (isDirty) {
+      const discard = await showConfirmModal({
+        title: "Unsaved Changes",
+        body: "This file has unsaved changes. Continue and delete it anyway?",
+        okLabel: "Continue",
+        danger: true,
+      });
+      if (!discard) return;
+    }
+
+    const accepted = await showConfirmModal({
+      title: "Delete File",
+      body: `Delete "${activeFilePath}"? This cannot be undone.`,
+      okLabel: "Delete",
+      danger: true,
+    });
+    if (!accepted) return;
+
+    const deletingPath = activeFilePath;
+    setEditorStatus(`Deleting ${deletingPath}...`);
+
+    try {
+      await api.deleteWorkspaceFile(deletingPath);
+      if (activeEditorMode === "plain" && plainEditor) {
+        plainEditor.value = "";
+        resetPlainHistory();
+      }
+      if (activeEditorMode === "monaco" && monacoEditor) {
+        monacoEditor.setValue("");
+      }
+      activeFilePath = "";
+      lastSavedContents = "";
+      isDirty = false;
+      updateCurrentFileLabel();
+      updateSaveButtonState();
+      setEditorMode("none");
+      setEditorStatus(`Deleted ${deletingPath}`);
+      log(`Deleted ${deletingPath}`);
+      refreshWorkspaceFiles();
+    } catch (error) {
+      setEditorStatus("Delete failed");
+      log(`Delete failed: ${error.message}`);
+    }
+  };
+
   document.getElementById("open-site-btn")?.addEventListener("click", () => {
     if (!api?.openExternal) {
       log("Open site unavailable.");
@@ -840,9 +1478,12 @@
     });
   });
 
-  document.getElementById("toggle-console-btn")?.addEventListener("click", () => {
-    if (!consoleEl) return;
-    consoleEl.classList.toggle("minimized");
+  toggleConsoleBtn?.addEventListener("click", () => {
+    setConsolePaneVisible(!consoleVisible);
+  });
+
+  toggleEditorBtn?.addEventListener("click", () => {
+    setEditorPaneVisible(!editorVisible);
   });
 
   document.getElementById("reload-shell-btn")?.addEventListener("click", () => {
@@ -858,12 +1499,72 @@
     saveCurrentFile();
   });
 
+  saveAsFileBtn?.addEventListener("click", () => {
+    saveCurrentFileAs();
+  });
+
+  newFileBtn?.addEventListener("click", () => {
+    createNewFile();
+  });
+
+  undoFileBtn?.addEventListener("click", () => {
+    runUndo();
+  });
+
+  redoFileBtn?.addEventListener("click", () => {
+    runRedo();
+  });
+
+  deleteFileBtn?.addEventListener("click", () => {
+    deleteCurrentFile();
+  });
+
   refreshFilesBtn?.addEventListener("click", () => {
     refreshWorkspaceFiles();
   });
 
   fileFilterInput?.addEventListener("input", () => {
     renderWorkspaceFiles();
+  });
+
+  confirmOkBtn?.addEventListener("click", () => {
+    resolveConfirmModal(true);
+  });
+
+  confirmCancelBtn?.addEventListener("click", () => {
+    resolveConfirmModal(false);
+  });
+
+  confirmOverlay?.addEventListener("click", event => {
+    if (event.target === confirmOverlay) {
+      resolveConfirmModal(false);
+    }
+  });
+
+  pathModalOkBtn?.addEventListener("click", () => {
+    resolvePathModal(true);
+  });
+
+  pathModalCancelBtn?.addEventListener("click", () => {
+    resolvePathModal(false);
+  });
+
+  pathModalOverlay?.addEventListener("click", event => {
+    if (event.target === pathModalOverlay) {
+      resolvePathModal(false);
+    }
+  });
+
+  pathModalInput?.addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      resolvePathModal(true);
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      resolvePathModal(false);
+    }
   });
 
   const bindWindowControl = (id, fnName) => {
@@ -910,6 +1611,20 @@
   buildBtn?.addEventListener("click", runBuild);
 
   document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && pendingPathModalResolve) {
+      event.preventDefault();
+      resolvePathModal(false);
+      return;
+    }
+
+    if (event.key === "Escape" && pendingConfirmResolve) {
+      event.preventDefault();
+      resolveConfirmModal(false);
+      return;
+    }
+
+    if (pendingConfirmResolve || pendingPathModalResolve) return;
+
     if (!(event.ctrlKey || event.metaKey)) return;
     const key = event.key.toLowerCase();
 
@@ -920,12 +1635,32 @@
 
     if (key === "l" && event.shiftKey) {
       event.preventDefault();
-      consoleEl?.classList.toggle("minimized");
+      setConsolePaneVisible(!consoleVisible);
     }
 
-    if (key === "s") {
+    if (key === "s" && event.shiftKey) {
+      event.preventDefault();
+      saveCurrentFileAs();
+    }
+
+    if (key === "s" && !event.shiftKey) {
       event.preventDefault();
       saveCurrentFile();
+    }
+
+    if (key === "n" && event.shiftKey) {
+      event.preventDefault();
+      createNewFile();
+    }
+
+    if (key === "z" && !event.shiftKey) {
+      event.preventDefault();
+      runUndo();
+    }
+
+    if (key === "y" || (key === "z" && event.shiftKey)) {
+      event.preventDefault();
+      runRedo();
     }
   });
 
@@ -996,6 +1731,8 @@
   updateCurrentFileLabel();
   updateSaveButtonState();
   initSplitter();
+  setEditorPaneVisible(window.localStorage.getItem(EDITOR_VISIBLE_KEY) !== "0");
+  setConsolePaneVisible(window.localStorage.getItem(CONSOLE_VISIBLE_KEY) !== "0");
   refreshWorkspaceFiles();
   ensureMonacoEditor().catch(() => {});
 

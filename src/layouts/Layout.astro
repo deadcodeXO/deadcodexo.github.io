@@ -193,21 +193,329 @@ const structuredData = pubDatetime
       <div class="site-grain"></div>
     </div>
 
-    <!--<div id="window-title-bar">
-      <div class="title">DEADCODEXO</div>
-      <div class="window-controls">
-        <button id="minimize-btn" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
-        <button id="maximize-btn" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg></button>
-        <button id="close-btn" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-      </div>
-    </div>-->
-
     <slot />
 
     <SearchModal />
 
     <!-- Load full theme logic -->
     <script src="../scripts/theme.ts"></script>
+
+    <!-- Electron titlebar - only created when running in Electron app -->
+    <script is:inline>
+      (function() {
+        if (!window.electronAPI) return;
+
+        function getPageIndicator() {
+          const path = window.location.pathname;
+          if (path === '/' || path === '/index.html') return 'Home';
+          const segment = path.split('/').filter(Boolean)[0] || 'Home';
+          const segmentFormatted = segment.charAt(0).toUpperCase() + segment.slice(1);
+          return segmentFormatted;
+        }
+
+        function createTitleBar() {
+          if (document.getElementById('window-title-bar')) return;
+
+          const titleBar = document.createElement('div');
+          titleBar.id = 'window-title-bar';
+          titleBar.innerHTML = `
+            <div class="title">DEADCODEXO - ${getPageIndicator()}</div>
+            <div class="window-controls">
+              <button id="minimize-btn" type="button" aria-label="Minimize">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              </button>
+              <button id="maximize-btn" type="button" aria-label="Maximize">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+              </button>
+              <button id="close-btn" type="button" aria-label="Close">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+          `;
+
+          document.body.insertBefore(titleBar, document.body.firstChild);
+          document.body.style.paddingTop = '30px';
+
+          document.getElementById('minimize-btn').addEventListener('click', () => {
+            window.electronAPI.minimizeWindow();
+          });
+          document.getElementById('maximize-btn').addEventListener('click', () => {
+            window.electronAPI.maximizeWindow();
+          });
+          document.getElementById('close-btn').addEventListener('click', () => {
+            window.electronAPI.closeWindow();
+          });
+        }
+
+        function ensureTitleBar() {
+          createTitleBar();
+          const titleEl = document.querySelector('#window-title-bar .title');
+          if (titleEl) titleEl.textContent = `DEADCODEXO - ${getPageIndicator()}`;
+        }
+
+        // Run on initial load
+        createTitleBar();
+
+        // Re-run on Astro view transitions
+        document.addEventListener('astro:page-load', ensureTitleBar);
+        window.addEventListener('popstate', ensureTitleBar);
+
+        // ========== Electron Console & Buttons ==========
+        function createElectronUI() {
+          if (document.getElementById('electron-cms-ui')) return;
+
+          const ui = document.createElement('div');
+          ui.id = 'electron-cms-ui';
+          ui.innerHTML = `
+            <div id="console-pane" class="console-pane">
+              <div class="console-header">
+                <div class="console-buttons">
+                  <button id="toggle-console" type="button">Hide Console</button>
+                  <button id="clear-console" type="button">Clear</button>
+                </div>
+              </div>
+              <div id="console-output" class="console-output"></div>
+            </div>
+            <div id="status-bar" class="status-bar">
+              <span id="status-text">Ready</span>
+            </div>
+            <div id="readyprod-ui" aria-live="polite">
+              <button id="settings-btn" type="button">⚙️</button>
+              <button id="open-browser-btn" type="button">Open Site</button>
+              <button id="readyprod-button" type="button">Build Site</button>
+              <div id="readyprod-toast" class="readyprod-toast hidden"></div>
+            </div>
+            <div id="settings-modal" class="settings-modal hidden">
+              <div class="settings-content">
+                <h3>Settings</h3>
+                <label>
+                  <input type="checkbox" id="auto-build-toggle"> Auto-build on file changes
+                </label>
+                <label>
+                  Console Font Size:
+                  <select id="console-font-size">
+                    <option value="0.75rem">Small</option>
+                    <option value="0.85rem" selected>Medium</option>
+                    <option value="1rem">Large</option>
+                  </select>
+                </label>
+                <button id="save-settings">Save</button>
+                <button id="close-settings">Close</button>
+              </div>
+            </div>
+          `;
+
+          document.body.appendChild(ui);
+          initElectronUIFunctions();
+        }
+
+        function initElectronUIFunctions() {
+          const button = document.getElementById("readyprod-button");
+          const openBrowserBtn = document.getElementById("open-browser-btn");
+          const settingsBtn = document.getElementById("settings-btn");
+          const settingsModal = document.getElementById("settings-modal");
+          const autoBuildToggle = document.getElementById("auto-build-toggle");
+          const consoleFontSize = document.getElementById("console-font-size");
+          const saveSettingsBtn = document.getElementById("save-settings");
+          const closeSettingsBtn = document.getElementById("close-settings");
+          const statusText = document.getElementById("status-text");
+          const toast = document.getElementById("readyprod-toast");
+          const consoleOutput = document.getElementById("console-output");
+          const clearConsoleBtn = document.getElementById("clear-console");
+          const toggleConsoleBtn = document.getElementById("toggle-console");
+          const consolePane = document.getElementById("console-pane");
+
+          if (!button) return;
+
+          const appendToConsole = (message) => {
+            if (!consoleOutput) return;
+            const timestamp = new Date().toLocaleTimeString();
+            consoleOutput.textContent += `[${timestamp}] ${message}\n`;
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+          };
+
+          const setStatus = (text) => {
+            if (statusText) statusText.textContent = text;
+          };
+
+          const setToast = (message, status) => {
+            if (!toast) return;
+            toast.textContent = message;
+            toast.classList.remove("hidden");
+            toast.style.borderColor = status === "success" ? "#42c567" : status === "failure" ? "#f16353" : "#5f97c5";
+            if (status !== "busy") {
+              setTimeout(() => {
+                toast.classList.add("hidden");
+              }, 3600);
+            }
+          };
+
+          const setButtonEnabled = (enabled) => {
+            button.disabled = !enabled;
+          };
+
+          if (clearConsoleBtn) {
+            clearConsoleBtn.onclick = () => {
+              if (consoleOutput) consoleOutput.textContent = "";
+            };
+          }
+
+          if (toggleConsoleBtn && consolePane) {
+            const toggleHandler = () => {
+              const isMinimized = consolePane.classList.contains("minimized");
+              const statusBar = document.getElementById("status-bar");
+              if (isMinimized) {
+                consolePane.classList.remove("minimized");
+                toggleConsoleBtn.textContent = "Hide Console";
+                if (statusBar) statusBar.style.bottom = "200px";
+              } else {
+                consolePane.classList.add("minimized");
+                toggleConsoleBtn.textContent = "Show Console";
+                if (statusBar) statusBar.style.bottom = "45px";
+              }
+            };
+            toggleConsoleBtn.onclick = toggleHandler;
+          }
+
+          if (openBrowserBtn) {
+            openBrowserBtn.onclick = () => {
+              window.electronAPI.openExternal("http://localhost:4321");
+            };
+          }
+
+          if (settingsBtn) {
+            settingsBtn.onclick = () => {
+              settingsModal.classList.remove("hidden");
+              if (autoBuildToggle) autoBuildToggle.checked = localStorage.getItem("autoBuild") === "true";
+              if (consoleFontSize) consoleFontSize.value = localStorage.getItem("consoleFontSize") || "0.85rem";
+            };
+          }
+
+          if (saveSettingsBtn) {
+            saveSettingsBtn.onclick = () => {
+              localStorage.setItem("autoBuild", autoBuildToggle?.checked ? "true" : "false");
+              localStorage.setItem("consoleFontSize", consoleFontSize?.value || "0.85rem");
+              if (consoleOutput) consoleOutput.style.fontSize = consoleFontSize?.value || "0.85rem";
+              settingsModal.classList.add("hidden");
+            };
+          }
+
+          if (closeSettingsBtn) {
+            closeSettingsBtn.onclick = () => {
+              settingsModal.classList.add("hidden");
+            };
+          }
+
+          document.addEventListener("keydown", (e) => {
+            if (e.ctrlKey || e.metaKey) {
+              switch (e.key) {
+                case "b":
+                case "B":
+                  e.preventDefault();
+                  if (button && !button.disabled) button.click();
+                  break;
+                case "c":
+                case "C":
+                  e.preventDefault();
+                  if (toggleConsoleBtn) toggleConsoleBtn.click();
+                  break;
+              }
+            }
+          });
+
+          document.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            window.electronAPI.showContextMenu();
+          });
+
+          window.electronAPI.onRefreshCms(() => {
+            const cmsFrame = document.getElementById("cms-frame");
+            if (cmsFrame) cmsFrame.src = cmsFrame.src;
+          });
+
+          const savedFontSize = localStorage.getItem("consoleFontSize") || "0.85rem";
+          if (consoleOutput) consoleOutput.style.fontSize = savedFontSize;
+          if (consoleFontSize) consoleFontSize.value = savedFontSize;
+
+          let buildTimeout = null;
+
+          button.onclick = () => {
+            setButtonEnabled(false);
+            setToast("Building site...", "busy");
+            setStatus("Building...");
+            appendToConsole("Starting build site...");
+
+            buildTimeout = setTimeout(() => {
+              setButtonEnabled(true);
+              setToast("Build timed out — try again", "failure");
+              setStatus("Build timed out");
+              appendToConsole("Build timed out after 90 seconds.");
+            }, 90000);
+
+            window.electronAPI.runReadyProd().catch(() => {
+              clearTimeout(buildTimeout);
+              setButtonEnabled(true);
+              setToast("Build failed", "failure");
+              setStatus("Build failed");
+              appendToConsole("Build failed.");
+            });
+          };
+
+          window.electronAPI.onReadyProdEvent((payload) => {
+            if (!payload) return;
+            if (payload.type === "start" || payload.type === "trigger" || payload.type === "busy") {
+              setToast(payload.message || "Building site...", "busy");
+              setButtonEnabled(false);
+              setStatus("Building...");
+              appendToConsole(payload.message || "Build started.");
+              return;
+            }
+            if (payload.type === "log") {
+              appendToConsole(payload.message);
+              return;
+            }
+            if (payload.type === "success") {
+              clearTimeout(buildTimeout);
+              setToast(payload.message || "Build complete", "success");
+              setButtonEnabled(true);
+              setStatus("Build complete");
+              appendToConsole(payload.message || "Build completed successfully.");
+              window.electronAPI.showNotification("Build Complete", "Your site has been built successfully!");
+              return;
+            }
+            if (payload.type === "failure" || payload.type === "error") {
+              clearTimeout(buildTimeout);
+              setToast(payload.message || "Build failed", "failure");
+              setButtonEnabled(true);
+              setStatus("Build failed");
+              appendToConsole(payload.message || "Build failed.");
+              window.electronAPI.showNotification("Build Failed", payload.message || "Build failed");
+              return;
+            }
+          });
+
+          window.electronAPI.getReadyProdStatus().then((status) => {
+            if (status?.running) {
+              setButtonEnabled(false);
+              setToast("Build in progress", "busy");
+              setStatus("Building...");
+              appendToConsole("Build already in progress on page load.");
+            } else {
+              setStatus("Ready");
+            }
+          });
+
+          appendToConsole("Electron CMS UI initialized.");
+        }
+
+        function ensureElectronUI() {
+          createElectronUI();
+        }
+
+        createElectronUI();
+        document.addEventListener('astro:page-load', ensureElectronUI);
+      })();
+    </script>
   </body>
 </html>
 
@@ -304,7 +612,7 @@ const structuredData = pubDatetime
     padding-top: 30px;
   }
 
-  #window-title-bar {
+  :global(#window-title-bar) {
     position: fixed;
     top: 0;
     left: 0;
@@ -322,18 +630,20 @@ const structuredData = pubDatetime
     font-weight: 500;
     -webkit-user-select: none;
     user-select: none;
+    box-sizing: border-box;
   }
 
-  #window-title-bar .title {
+  :global(#window-title-bar .title) {
     flex: 1;
   }
 
-  #window-title-bar .window-controls {
+  :global(#window-title-bar .window-controls) {
     display: flex;
     gap: 0;
+    -webkit-app-region: no-drag;
   }
 
-  #window-title-bar button {
+  :global(#window-title-bar button) {
     -webkit-app-region: no-drag;
     background: none;
     border: none;
@@ -351,23 +661,24 @@ const structuredData = pubDatetime
     pointer-events: auto;
     -webkit-user-select: none;
     user-select: none;
+    box-sizing: border-box;
   }
 
-  #window-title-bar button:hover {
+  :global(#window-title-bar button:hover) {
     background: rgba(95, 151, 197, 0.2);
   }
 
-  #close-btn:hover {
+  :global(#close-btn:hover) {
     background: rgba(95, 151, 197, 0.2);
   }
 
-  html[data-theme="light"] #window-title-bar {
+  :global(html[data-theme="light"] #window-title-bar) {
     background: #f8f9fa;
     color: #5f97c5;
   }
 
   /* CMS UI Styles */
-  #readyprod-ui {
+  :global(#readyprod-ui) {
     position: fixed;
     right: 1rem;
     bottom: 1rem;
@@ -378,7 +689,7 @@ const structuredData = pubDatetime
     gap: 0.5rem;
     pointer-events: none;
   }
-  #readyprod-button {
+  :global(#readyprod-button) {
     pointer-events: auto;
     font-size: 0.85rem;
     padding: 0.45rem 0.85rem;
@@ -388,16 +699,16 @@ const structuredData = pubDatetime
     color: #d9e5ff;
     cursor: pointer;
   }
-  #readyprod-button:disabled {
+  :global(#readyprod-button:disabled) {
     opacity: 0.5;
     cursor: not-allowed;
   }
-  html[data-theme="light"] #readyprod-button {
+  :global(html[data-theme="light"] #readyprod-button) {
     background: rgba(248, 249, 250, 0.96);
     color: #212529;
     border-color: #5f97c5;
   }
-  .readyprod-toast {
+  :global(.readyprod-toast) {
     min-width: 260px;
     max-width: 320px;
     padding: 0.55rem 0.75rem;
@@ -411,8 +722,8 @@ const structuredData = pubDatetime
     word-wrap: break-word;
     pointer-events: auto;
   }
-  .readyprod-toast.hidden { display: none; }
-  .console-pane {
+  :global(.readyprod-toast.hidden) { display: none; }
+  :global(.console-pane) {
     position: fixed;
     bottom: 0;
     left: 0;
@@ -424,10 +735,10 @@ const structuredData = pubDatetime
     flex-direction: column;
     z-index: 1000;
   }
-  .console-pane.minimized {
+  :global(.console-pane.minimized) {
     height: 45px;
   }
-  .console-output {
+  :global(.console-output) {
     flex: 1;
     overflow-y: auto;
     padding: 0.5rem;
@@ -438,12 +749,12 @@ const structuredData = pubDatetime
     word-wrap: break-word;
     transition: max-height 0.3s ease;
   }
-  .console-pane.minimized .console-output {
+  :global(.console-pane.minimized .console-output) {
     max-height: 0;
     padding: 0;
     overflow: hidden;
   }
-  .console-header {
+  :global(.console-header) {
     display: flex;
     justify-content: flex-start;
     align-items: center;
@@ -453,11 +764,11 @@ const structuredData = pubDatetime
     font-size: 0.8rem;
     color: #eaf3ff;
   }
-  .console-buttons {
+  :global(.console-buttons) {
     display: flex;
     gap: 0.5rem;
   }
-  .console-header button {
+  :global(.console-header button) {
     background: none;
     border: 1px solid #5f97c5;
     color: #eaf3ff;
@@ -465,21 +776,21 @@ const structuredData = pubDatetime
     cursor: pointer;
     border-radius: 0.2rem;
   }
-  html[data-theme="light"] .console-pane {
+  :global(html[data-theme="light"] .console-pane) {
     background: rgba(255, 255, 255, 0.95);
   }
-  html[data-theme="light"] .console-header {
+  :global(html[data-theme="light"] .console-header) {
     background: rgba(248, 249, 250, 0.95);
     color: #212529;
   }
-  html[data-theme="light"] .console-output {
+  :global(html[data-theme="light"] .console-output) {
     color: #212529;
   }
-  html[data-theme="light"] .console-header button {
+  :global(html[data-theme="light"] .console-header button) {
     color: #212529;
     border-color: #5f97c5;
   }
-  .status-bar {
+  :global(.status-bar) {
     position: fixed;
     bottom: 200px;
     left: 0;
@@ -494,12 +805,12 @@ const structuredData = pubDatetime
     color: #eaf3ff;
     z-index: 999;
   }
-  html[data-theme="light"] .status-bar {
+  :global(html[data-theme="light"] .status-bar) {
     background: rgba(248, 249, 250, 0.9);
     color: #212529;
     border-color: #5f97c5;
   }
-  .settings-modal {
+  :global(.settings-modal) {
     position: fixed;
     top: 0;
     left: 0;
@@ -511,23 +822,23 @@ const structuredData = pubDatetime
     justify-content: center;
     z-index: 10001;
   }
-  .settings-modal.hidden { display: none; }
-  .settings-content {
+  :global(.settings-modal.hidden) { display: none; }
+  :global(.settings-content) {
     background: #202225;
     color: #eaf3ff;
     padding: 1rem;
     border-radius: 0.5rem;
     min-width: 300px;
   }
-  html[data-theme="light"] .settings-content {
+  :global(html[data-theme="light"] .settings-content) {
     background: #f8f9fa;
     color: #212529;
   }
-  .settings-content label {
+  :global(.settings-content label) {
     display: block;
     margin: 0.5rem 0;
   }
-  .settings-content button {
+  :global(.settings-content button) {
     margin: 0.5rem 0.5rem 0 0;
     padding: 0.5rem;
     border: 1px solid #5f97c5;
@@ -535,10 +846,10 @@ const structuredData = pubDatetime
     color: #eaf3ff;
     cursor: pointer;
   }
-  html[data-theme="light"] .settings-content button {
+  :global(html[data-theme="light"] .settings-content button) {
     color: #212529;
   }
-  #settings-btn {
+  :global(#settings-btn) {
     font-size: 1rem;
     width: auto;
     height: auto;
@@ -549,10 +860,10 @@ const structuredData = pubDatetime
     border-radius: 0.35rem;
     cursor: pointer;
   }
-  html[data-theme="light"] #settings-btn {
+  :global(html[data-theme="light"] #settings-btn) {
     border-color: #5f97c5;
   }
-  #open-browser-btn {
+  :global(#open-browser-btn) {
     font-size: 0.85rem;
     padding: 0.45rem 0.85rem;
     border: 1px solid #5f97c5;
@@ -562,9 +873,14 @@ const structuredData = pubDatetime
     cursor: pointer;
     pointer-events: auto;
   }
-  #open-browser-btn:disabled {
+  :global(#open-browser-btn:disabled) {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+  :global(html[data-theme="light"] #open-browser-btn) {
+    background: rgba(248, 249, 250, 0.96);
+    color: #212529;
+    border-color: #5f97c5;
   }
   /* Global Build Button */
   #global-build-ui {

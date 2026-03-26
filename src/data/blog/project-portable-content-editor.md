@@ -19,7 +19,7 @@ Workflow is dead simple:
 1. Open app → splash shows.
 2. Backend spins up in a few secs.
 3. Editor window pops.
-4. Write, preview, commit — done.
+4. Write, preview, commit - done.
 
 ## Splash screen in action
 ```javascript

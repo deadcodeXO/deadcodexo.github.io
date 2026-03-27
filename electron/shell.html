@@ -452,27 +452,6 @@
         overflow: hidden;
       }
 
-      .plain-editor {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        border: none;
-        outline: none;
-        resize: none !important;
-        background: #0f1420;
-        color: #dbe6ff;
-        padding: 12px;
-        font-family: Consolas, "Cascadia Code", monospace;
-        font-size: 13px;
-        line-height: 1.45;
-        tab-size: 2;
-      }
-
-      .plain-editor.hidden {
-        display: none;
-      }
-
       .editor-empty {
         position: absolute;
         inset: 0;
@@ -589,11 +568,6 @@
 
       body[data-theme="light"] .file-tree-toggle {
         color: #6f86b1;
-      }
-
-      body[data-theme="light"] .plain-editor {
-        background: #f7faff;
-        color: #1b2d4a;
       }
 
       .confirm-overlay {
@@ -980,6 +954,13 @@
                     <path d="M20 9H10a6 6 0 0 0 0 12h1"></path>
                   </svg>
                 </button>
+                <button class="code-pane-btn" id="ai-complete-btn" type="button" aria-label="Trigger AI completion" title="AI complete (Ctrl+Alt+\\)">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m12 3 1.7 3.7L18 8.4l-3.1 3 0.8 4.4-3.7-2-3.7 2 0.8-4.4L6 8.4l4.3-1.7Z"></path>
+                    <path d="M19 15v6"></path>
+                    <path d="M16 18h6"></path>
+                  </svg>
+                </button>
                 <button class="code-pane-btn" id="new-file-btn" type="button" aria-label="Create new file" title="New file">
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M14 3v6h6"></path>
@@ -1043,12 +1024,6 @@
                   <div class="editor-empty" id="editor-empty">
                     Select a file to edit. Your changes stay local to this repository.
                   </div>
-                  <textarea
-                    id="plain-editor"
-                    class="plain-editor hidden"
-                    spellcheck="false"
-                    aria-label="Fallback code editor"
-                  ></textarea>
                 </div>
               </section>
             </div>

@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell, Notification } from "electron";
 import { spawn } from "node:child_process";
+import http from "node:http";
 import {
   createWriteStream,
   existsSync,
@@ -12,7 +13,7 @@ import {
 } from "node:fs";
 import net from "node:net";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { provisionWorkspaceFromPayload } from "./provision.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -23,11 +24,18 @@ const bundledProjectRoot = path.resolve(__dirname, "..");
 const DEV_SERVER_HOST = "127.0.0.1";        // Astro dev server host
 const DEV_SERVER_PORT = 4321;               // Astro dev server port
 const DEV_SERVER_URL = `http://${DEV_SERVER_HOST}:${DEV_SERVER_PORT}`; // Astro URL
+const MONACO_ASSET_HOST = DEV_SERVER_HOST;
+const MONACO_ASSET_PORT_START = 4382;
+const MONACO_ASSET_PORT_END = 4499;
+const DEFAULT_LMSTUDIO_BASE_URL = "http://127.0.0.1:1234/v1";
 
 const DEFAULT_DECAP_PORT = 8081;            // Default Decap CMS proxy port
 const MAX_DECAP_PORT = 8199;                // Optional upper bound if auto-incrementing ports
 const MAX_WORKSPACE_FILES = 5000;
 const MAX_WORKSPACE_FILE_SIZE_BYTES = 2 * 1024 * 1024;
+const MONACO_VERSION = "0.53.0";
+const MONACO_CDN_AMD_BASE_URL = `https://cdn.jsdelivr.net/npm/monaco-editor@${MONACO_VERSION}/min/vs`;
+const MONACO_CDN_ESM_BASE_URL = `https://cdn.jsdelivr.net/npm/monaco-editor@${MONACO_VERSION}/esm/vs`;
 const WORKSPACE_IGNORED_DIRS = new Set([
   ".git",
   ".astro",
@@ -145,13 +153,19 @@ let splashWindowReady = false;
 let splashFlushScheduled = false;
 let pendingSplashProgress = 0;
 let pendingSplashTitle = "Starting content editor...";
-let pendingSplashDetail = "Launching Astro + Decap CMS";
+let pendingSplashDetail = "Bootstrapping Monaco + Astro + Decap";
 let cmsServerProcesses = [];
 let startupLogPath = "";
 let startupLogStream = null;
 let workspaceRoot = bundledProjectRoot;
 let decapServerPort = DEFAULT_DECAP_PORT;
 const startupLogTail = [];
+let monacoAssetServer = null;
+let monacoAssetBaseUrl = "";
+let monacoEsmBaseUrl = "";
+let monacoShellUrl = "";
+let monacoPilotScriptUrl = "";
+let monacoAssetSourceDir = "";
 
 let readyProdRunning = false;
 let readyProdLastStatus = "idle";
@@ -160,13 +174,212 @@ function toPosixPath(value) {
   return value.replaceAll("\\", "/");
 }
 
-function isPathInsideWorkspace(targetPath) {
+function normalizeLmStudioBaseUrl(rawValue) {
+  const fallback = DEFAULT_LMSTUDIO_BASE_URL;
+  const raw = String(rawValue || fallback).trim();
+  const withProtocol = /^[a-z]+:\/\//i.test(raw) ? raw : `http://${raw}`;
+  try {
+    const url = new URL(withProtocol);
+    return `${url.origin}${url.pathname}`.replace(/\/+$/, "");
+  } catch {
+    return fallback.replace(/\/+$/, "");
+  }
+}
+
+function getLmStudioApiBaseCandidates(rawBaseUrl) {
+  const normalized = normalizeLmStudioBaseUrl(rawBaseUrl);
+  const candidates = [];
+  const pushUnique = value => {
+    if (!value) return;
+    const cleaned = String(value).replace(/\/+$/, "");
+    if (!cleaned || candidates.includes(cleaned)) return;
+    candidates.push(cleaned);
+  };
+
+  if (normalized.endsWith("/v1")) {
+    pushUnique(normalized);
+    pushUnique(normalized.slice(0, -3));
+  } else {
+    pushUnique(`${normalized}/v1`);
+    pushUnique(normalized);
+  }
+
+  return candidates;
+}
+
+async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function buildLmStudioPrompt(completionMetadata) {
+  const stack = [completionMetadata?.language, ...(completionMetadata?.technologies || [])]
+    .filter(Boolean)
+    .join(", ");
+  const relatedFiles = Array.isArray(completionMetadata?.relatedFiles)
+    ? completionMetadata.relatedFiles
+    : [];
+  const relatedContext = relatedFiles
+    .slice(0, 4)
+    .map(file => `### ${file.path}\n${file.content || ""}`)
+    .join("\n\n");
+
+  return [
+    stack ? `Tech stack: ${stack}` : "",
+    completionMetadata?.filename ? `File: ${completionMetadata.filename}` : "",
+    relatedContext ? `Related files:\n${relatedContext}` : "",
+    "Current code:",
+    "```",
+    `${completionMetadata?.textBeforeCursor || ""}<|cursor|>${completionMetadata?.textAfterCursor || ""}`,
+    "```",
+    "",
+    "Return only the completion text to insert at the cursor.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+async function resolveLmStudioModelFromApiBases({
+  apiBases,
+  apiKey,
+  explicitModel,
+}) {
+  if (explicitModel) return explicitModel;
+  const headers = {};
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
+  for (const apiBase of apiBases) {
+    const modelsUrl = `${apiBase}/models`;
+    try {
+      const response = await fetchJsonWithTimeout(
+        modelsUrl,
+        { method: "GET", headers },
+        6000
+      );
+      if (!response.ok) continue;
+      const payload = await response.json();
+      const modelId = Array.isArray(payload?.data) ? payload.data[0]?.id : "";
+      if (typeof modelId === "string" && modelId.trim()) {
+        return modelId.trim();
+      }
+    } catch {
+      // Try next candidate.
+    }
+  }
+
+  return "local-model";
+}
+
+async function requestLmStudioCompletionFromMain(payload) {
+  const body = payload?.body;
+  const metadata = body?.completionMetadata;
+  if (!metadata || typeof metadata !== "object") {
+    return { completion: null, error: "Missing completion metadata." };
+  }
+
+  const lmstudio = payload?.lmstudio || {};
+  const configuredBase =
+    lmstudio.baseUrl || process.env.DCX_LMSTUDIO_BASE_URL || DEFAULT_LMSTUDIO_BASE_URL;
+  const apiBases = getLmStudioApiBaseCandidates(configuredBase);
+  const apiKey = String(lmstudio.apiKey || process.env.DCX_LMSTUDIO_API_KEY || "lm-studio");
+  const model = await resolveLmStudioModelFromApiBases({
+    apiBases,
+    apiKey,
+    explicitModel: String(lmstudio.model || process.env.DCX_LMSTUDIO_MODEL || "").trim(),
+  });
+  const prompt = buildLmStudioPrompt(metadata);
+  const temperature = Number.isFinite(Number(lmstudio.temperature))
+    ? Number(lmstudio.temperature)
+    : 0.2;
+  const maxTokens = Number.isFinite(Number(lmstudio.maxTokens))
+    ? Number(lmstudio.maxTokens)
+    : 192;
+
+  const headers = {
+    "Content-Type": "application/json",
+  };
+  if (apiKey) {
+    headers.Authorization = `Bearer ${apiKey}`;
+  }
+
+  const errors = [];
+  for (const apiBase of apiBases) {
+    const endpoint = `${apiBase}/chat/completions`;
+    try {
+      const response = await fetchJsonWithTimeout(
+        endpoint,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            model,
+            temperature,
+            max_tokens: maxTokens,
+            stream: false,
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You are a code completion engine. Return only code to insert at the cursor. No markdown.",
+              },
+              {
+                role: "user",
+                content: prompt,
+              },
+            ],
+          }),
+        },
+        20000
+      );
+
+      if (!response.ok) {
+        const text = await response.text();
+        errors.push(`${endpoint} -> ${response.status} ${text}`);
+        continue;
+      }
+
+      const completionPayload = await response.json();
+      const completion =
+        completionPayload?.choices?.[0]?.message?.content ??
+        completionPayload?.choices?.[0]?.text ??
+        null;
+      return {
+        completion: typeof completion === "string" ? completion : null,
+      };
+    } catch (error) {
+      errors.push(
+        `${endpoint} -> ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  const detail = errors.length ? errors.join(" | ") : "unknown error";
+  return {
+    completion: null,
+    error: `LM Studio request failed (${configuredBase}): ${detail}`,
+  };
+}
+
+function isPathInsideRoot(rootPath, targetPath) {
   const normalizeForCompare = value =>
     process.platform === "win32" ? value.toLowerCase() : value;
-  const root = normalizeForCompare(path.resolve(workspaceRoot));
+  const root = normalizeForCompare(path.resolve(rootPath));
   const resolved = normalizeForCompare(path.resolve(targetPath));
   if (resolved === root) return true;
   return resolved.startsWith(`${root}${path.sep}`);
+}
+
+function isPathInsideWorkspace(targetPath) {
+  return isPathInsideRoot(workspaceRoot, targetPath);
 }
 
 function resolveWorkspacePath(relativePath) {
@@ -242,19 +455,370 @@ function listWorkspaceFiles() {
   return files;
 }
 
-function getMonacoBaseUrl() {
-  const localMonacoDir = path.join(
-    workspaceRoot,
-    "node_modules",
-    "monaco-editor",
-    "min",
-    "vs"
+function isValidMonacoPackageDir(monacoPackageDir) {
+  if (!monacoPackageDir) return false;
+  const amdLoaderPath = path.join(monacoPackageDir, "min", "vs", "loader.js");
+  const esmEditorApiPath = path.join(
+    monacoPackageDir,
+    "esm",
+    "vs",
+    "editor",
+    "editor.api.js"
   );
-  if (existsSync(localMonacoDir)) {
-    return pathToFileURL(localMonacoDir).toString();
+  return existsSync(amdLoaderPath) && existsSync(esmEditorApiPath);
+}
+
+function getWorkspaceMonacoPackageDir() {
+  return path.join(workspaceRoot, "node_modules", "monaco-editor");
+}
+
+function getBundledMonacoPackageDirs() {
+  const dirs = [];
+  const pushUnique = value => {
+    if (!value) return;
+    if (dirs.includes(value)) return;
+    dirs.push(value);
+  };
+
+  pushUnique(path.join(bundledProjectRoot, "node_modules", "monaco-editor"));
+  pushUnique(
+    path.join(
+      process.resourcesPath,
+      "app.asar.unpacked",
+      "node_modules",
+      "monaco-editor"
+    )
+  );
+  pushUnique(path.join(process.resourcesPath, "node_modules", "monaco-editor"));
+
+  return dirs;
+}
+
+function getMonacoCacheRootDir() {
+  return path.join(app.getPath("userData"), "monaco-cache", `v${MONACO_VERSION}`);
+}
+
+function isValidMonacoCacheRoot(cacheRootDir) {
+  if (!cacheRootDir) return false;
+  const amdLoaderPath = path.join(cacheRootDir, "min", "vs", "loader.js");
+  const esmEditorApiPath = path.join(
+    cacheRootDir,
+    "esm",
+    "vs",
+    "editor",
+    "editor.api.js"
+  );
+  return existsSync(amdLoaderPath) && existsSync(esmEditorApiPath);
+}
+
+function ensureMonacoCache() {
+  const cacheRootDir = getMonacoCacheRootDir();
+  if (isValidMonacoCacheRoot(cacheRootDir)) return cacheRootDir;
+  return null;
+}
+
+function getMonacoPackageSourceDir() {
+  const localPackage = getWorkspaceMonacoPackageDir();
+  if (isValidMonacoPackageDir(localPackage)) return localPackage;
+
+  for (const bundledPackageDir of getBundledMonacoPackageDirs()) {
+    if (isValidMonacoPackageDir(bundledPackageDir)) {
+      return bundledPackageDir;
+    }
   }
 
-  return "https://cdn.jsdelivr.net/npm/monaco-editor@0.53.0/min/vs";
+  const cachedRoot = ensureMonacoCache();
+  if (cachedRoot && isValidMonacoCacheRoot(cachedRoot)) {
+    return cachedRoot;
+  }
+
+  return "";
+}
+
+function getWorkspaceMonacoPilotScriptPath() {
+  return path.join(
+    workspaceRoot,
+    "node_modules",
+    "monacopilot",
+    "dist",
+    "index.global.js"
+  );
+}
+
+function getBundledMonacoPilotScriptPaths() {
+  const paths = [];
+  const pushUnique = value => {
+    if (!value) return;
+    if (paths.includes(value)) return;
+    paths.push(value);
+  };
+
+  pushUnique(
+    path.join(
+      bundledProjectRoot,
+      "node_modules",
+      "monacopilot",
+      "dist",
+      "index.global.js"
+    )
+  );
+  pushUnique(
+    path.join(
+      process.resourcesPath,
+      "app.asar.unpacked",
+      "node_modules",
+      "monacopilot",
+      "dist",
+      "index.global.js"
+    )
+  );
+  pushUnique(
+    path.join(
+      process.resourcesPath,
+      "node_modules",
+      "monacopilot",
+      "dist",
+      "index.global.js"
+    )
+  );
+
+  return paths;
+}
+
+function getMonacoPilotScriptPath() {
+  const workspaceScript = getWorkspaceMonacoPilotScriptPath();
+  if (existsSync(workspaceScript)) return workspaceScript;
+
+  for (const bundledScript of getBundledMonacoPilotScriptPaths()) {
+    if (existsSync(bundledScript)) return bundledScript;
+  }
+
+  return "";
+}
+
+function getMonacoEsmBaseUrls() {
+  const urls = [];
+  const pushUnique = value => {
+    if (!value) return;
+    if (urls.includes(value)) return;
+    urls.push(value);
+  };
+
+  if (monacoEsmBaseUrl) {
+    pushUnique(monacoEsmBaseUrl);
+  }
+  pushUnique(MONACO_CDN_ESM_BASE_URL);
+  return urls;
+}
+
+function getMonacoAmdBaseUrls() {
+  const urls = [];
+  const pushUnique = value => {
+    if (!value) return;
+    if (urls.includes(value)) return;
+    urls.push(value);
+  };
+
+  if (monacoAssetBaseUrl) {
+    pushUnique(monacoAssetBaseUrl);
+  }
+  if (!urls.length) {
+    pushUnique(MONACO_CDN_AMD_BASE_URL);
+  }
+  return urls;
+}
+
+function getMonacoBaseUrls() {
+  return getMonacoAmdBaseUrls();
+}
+
+function getMonacoMimeType(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  switch (ext) {
+    case ".js":
+      return "application/javascript; charset=utf-8";
+    case ".css":
+      return "text/css; charset=utf-8";
+    case ".json":
+      return "application/json; charset=utf-8";
+    case ".html":
+      return "text/html; charset=utf-8";
+    case ".svg":
+      return "image/svg+xml";
+    case ".ttf":
+      return "font/ttf";
+    case ".woff":
+      return "font/woff";
+    case ".woff2":
+      return "font/woff2";
+    case ".map":
+      return "application/json; charset=utf-8";
+    default:
+      return "application/octet-stream";
+  }
+}
+
+function stopMonacoAssetServer() {
+  if (!monacoAssetServer) return;
+  try {
+    monacoAssetServer.close();
+  } catch {
+    // Ignore close errors during shutdown.
+  }
+  monacoAssetServer = null;
+  monacoAssetBaseUrl = "";
+  monacoEsmBaseUrl = "";
+  monacoShellUrl = "";
+  monacoPilotScriptUrl = "";
+  monacoAssetSourceDir = "";
+}
+
+async function startMonacoAssetServer() {
+  if (monacoAssetServer && monacoAssetBaseUrl) {
+    return monacoAssetBaseUrl;
+  }
+
+  const sourceDir = getMonacoPackageSourceDir();
+
+  if (!sourceDir) {
+    appendStartupLog("Monaco asset server skipped: no valid local Monaco source.");
+    return "";
+  }
+
+  const port = await findAvailablePort(
+    MONACO_ASSET_HOST,
+    MONACO_ASSET_PORT_START,
+    MONACO_ASSET_PORT_END
+  );
+
+  const server = http.createServer((request, response) => {
+    try {
+      const requestUrl = new URL(
+        request.url || "/",
+        `http://${MONACO_ASSET_HOST}:${String(port)}`
+      );
+      const pathname = decodeURIComponent(requestUrl.pathname || "/");
+      if (pathname === "/" || pathname === "/index.html") {
+        response.writeHead(302, { Location: "/shell.html" });
+        response.end();
+        return;
+      }
+
+      if (pathname === "/shell.html" || pathname === "/shell.js") {
+        const shellFileName = pathname === "/shell.html" ? "shell.html" : "shell.js";
+        const shellFilePath = path.join(__dirname, shellFileName);
+        if (!existsSync(shellFilePath)) {
+          response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+          response.end("Not found");
+          return;
+        }
+
+        const shellBody = readFileSync(shellFilePath);
+        response.writeHead(200, {
+          "Content-Type":
+            shellFileName === "shell.html"
+              ? "text/html; charset=utf-8"
+              : "application/javascript; charset=utf-8",
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+          "Access-Control-Allow-Origin": "*",
+        });
+        response.end(shellBody);
+        return;
+      }
+
+      if (pathname === "/vendor/monacopilot.js") {
+        const monacoPilotScriptPath = getMonacoPilotScriptPath();
+        if (!monacoPilotScriptPath || !existsSync(monacoPilotScriptPath)) {
+          response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+          response.end("Not found");
+          return;
+        }
+
+        const monacoPilotBody = readFileSync(monacoPilotScriptPath);
+        response.writeHead(200, {
+          "Content-Type": "application/javascript; charset=utf-8",
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+          "Access-Control-Allow-Origin": "*",
+        });
+        response.end(monacoPilotBody);
+        return;
+      }
+
+      const assetPrefix =
+        pathname.startsWith("/monaco/esm/vs/")
+          ? "/monaco/esm/vs/"
+          : pathname.startsWith("/monaco/min/vs/")
+            ? "/monaco/min/vs/"
+            : "";
+      if (!assetPrefix) {
+        response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+        response.end("Not found");
+        return;
+      }
+
+      const relativePath = pathname.slice(assetPrefix.length);
+      if (!relativePath || relativePath.endsWith("/")) {
+        response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+        response.end("Not found");
+        return;
+      }
+
+      const normalizedRelative = path.normalize(relativePath);
+      const monacoSubRoot = assetPrefix === "/monaco/esm/vs/" ? "esm" : "min";
+      const monacoVsRoot = path.join(sourceDir, monacoSubRoot, "vs");
+      const absolutePath = path.resolve(monacoVsRoot, normalizedRelative);
+      if (!isPathInsideRoot(monacoVsRoot, absolutePath)) {
+        response.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+        response.end("Forbidden");
+        return;
+      }
+
+      let fileStat = null;
+      try {
+        fileStat = statSync(absolutePath);
+      } catch {
+        fileStat = null;
+      }
+      if (!fileStat || !fileStat.isFile()) {
+        response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+        response.end("Not found");
+        return;
+      }
+
+      const contents = readFileSync(absolutePath);
+      response.writeHead(200, {
+        "Content-Type": getMonacoMimeType(absolutePath),
+        "Cache-Control": "public, max-age=31536000, immutable",
+        "Access-Control-Allow-Origin": "*",
+      });
+      response.end(contents);
+    } catch (error) {
+      response.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+      response.end(`Monaco asset error: ${error.message}`);
+    }
+  });
+
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, MONACO_ASSET_HOST, () => resolve(undefined));
+  });
+
+  monacoAssetServer = server;
+  monacoShellUrl = `http://${MONACO_ASSET_HOST}:${String(port)}/shell.html`;
+  monacoAssetBaseUrl = `http://${MONACO_ASSET_HOST}:${String(port)}/monaco/min/vs`;
+  monacoEsmBaseUrl = `http://${MONACO_ASSET_HOST}:${String(port)}/monaco/esm/vs`;
+  monacoPilotScriptUrl = `http://${MONACO_ASSET_HOST}:${String(port)}/vendor/monacopilot.js`;
+  monacoAssetSourceDir = sourceDir;
+  appendStartupLog(
+    `Companion asset server ready at ${monacoShellUrl} (source: ${monacoAssetSourceDir})`
+  );
+  const monacoPilotScriptPath = getMonacoPilotScriptPath();
+  if (monacoPilotScriptPath) {
+    appendStartupLog(`MonacoPilot script ready: ${monacoPilotScriptPath}`);
+  } else {
+    appendStartupLog("MonacoPilot script not found in local dependencies.");
+  }
+  return monacoAssetBaseUrl;
 }
 
 
@@ -568,9 +1132,44 @@ ipcMain.handle("workspace-delete-file", (_event, relativePath) => {
   };
 });
 
-ipcMain.handle("workspace-monaco-base-url", () => ({
-  baseUrl: getMonacoBaseUrl(),
-}));
+ipcMain.handle("workspace-monaco-base-url", () => {
+  const baseUrls = getMonacoBaseUrls();
+  const esmBaseUrls = getMonacoEsmBaseUrls();
+  return {
+    baseUrl: baseUrls[0] || MONACO_CDN_AMD_BASE_URL,
+    baseUrls,
+    esmBaseUrl: esmBaseUrls[0] || MONACO_CDN_ESM_BASE_URL,
+    esmBaseUrls,
+  };
+});
+
+ipcMain.handle("workspace-monacopilot-config", () => {
+  const baseUrlRaw = process.env.DCX_LMSTUDIO_BASE_URL || DEFAULT_LMSTUDIO_BASE_URL;
+  const baseUrl = String(baseUrlRaw).replace(/\/+$/, "");
+  const enabled = process.env.DCX_MONACOPILOT !== "0";
+  return {
+    enabled,
+    scriptUrl: monacoPilotScriptUrl || "",
+    lmstudio: {
+      baseUrl,
+      model: process.env.DCX_LMSTUDIO_MODEL || "",
+      apiKey: process.env.DCX_LMSTUDIO_API_KEY || "lm-studio",
+      maxTokens: Number.parseInt(process.env.DCX_LMSTUDIO_MAX_TOKENS || "192", 10) || 192,
+      temperature: Number.parseFloat(process.env.DCX_LMSTUDIO_TEMPERATURE || "0.2") || 0.2,
+    },
+  };
+});
+
+ipcMain.handle("workspace-monacopilot-complete", async (_event, payload) => {
+  try {
+    return await requestLmStudioCompletionFromMain(payload);
+  } catch (error) {
+    return {
+      completion: null,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+});
 
 function isWorkspaceRoot(candidatePath) {
   return (
@@ -664,14 +1263,23 @@ function createMainWindow() {
   editorUrl.searchParams.set("cms_proxy_port", String(decapServerPort));
   const shellPath = path.join(__dirname, "shell.html");
   appendStartupLog(`Preload path: ${path.join(__dirname, "preload.cjs")}`);
-  appendStartupLog(`Loading main window shell: ${shellPath}`);
+  appendStartupLog(`Shell file path: ${shellPath}`);
   appendStartupLog(`Editor target URL: ${editorUrl.toString()}`);
-  mainWindow.loadFile(shellPath, {
-    query: {
-      editorUrl: editorUrl.toString(),
-      siteUrl: DEV_SERVER_URL,
-    },
-  });
+  if (monacoShellUrl) {
+    const shellUrl = new URL(monacoShellUrl);
+    shellUrl.searchParams.set("editorUrl", editorUrl.toString());
+    shellUrl.searchParams.set("siteUrl", DEV_SERVER_URL);
+    appendStartupLog(`Loading main window shell URL: ${shellUrl.toString()}`);
+    mainWindow.loadURL(shellUrl.toString());
+  } else {
+    appendStartupLog("Companion shell URL unavailable; falling back to file:// shell.");
+    mainWindow.loadFile(shellPath, {
+      query: {
+        editorUrl: editorUrl.toString(),
+        siteUrl: DEV_SERVER_URL,
+      },
+    });
+  }
 
   let revealed = false;
   const revealWindow = () => {
@@ -772,8 +1380,15 @@ function getCmsServerPaths() {
     "vs",
     "loader.js"
   );
+  const monacoPilotScriptPath = path.join(
+    workspaceRoot,
+    "node_modules",
+    "monacopilot",
+    "dist",
+    "index.global.js"
+  );
 
-  return { astroCliPath, decapServerPath, monacoLoaderPath };
+  return { astroCliPath, decapServerPath, monacoLoaderPath, monacoPilotScriptPath };
 }
 
 function runSetupCommand(label, command, args = []) {
@@ -816,12 +1431,14 @@ function runSetupCommand(label, command, args = []) {
 }
 
 async function ensureWorkspaceDependencies() {
-  const { astroCliPath, decapServerPath, monacoLoaderPath } = getCmsServerPaths();
+  const { astroCliPath, decapServerPath, monacoLoaderPath, monacoPilotScriptPath } =
+    getCmsServerPaths();
   const astroExists = existsSync(astroCliPath);
   const decapExists = existsSync(decapServerPath);
   const monacoExists = existsSync(monacoLoaderPath);
+  const monacoPilotExists = existsSync(monacoPilotScriptPath);
 
-  if (astroExists && decapExists && monacoExists) {
+  if (astroExists && decapExists && monacoExists && monacoPilotExists) {
     appendStartupLog("Workspace dependencies already present.");
     setSplashStatus("Checking dependencies...", "Dependencies already installed");
     return;
@@ -836,12 +1453,15 @@ async function ensureWorkspaceDependencies() {
   const astroInstalled = existsSync(astroCliPath);
   const decapInstalled = existsSync(decapServerPath);
   const monacoInstalled = existsSync(monacoLoaderPath);
+  const monacoPilotInstalled = existsSync(monacoPilotScriptPath);
 
-  if (!astroInstalled || !decapInstalled || !monacoInstalled) {
+  if (!astroInstalled || !decapInstalled || !monacoInstalled || !monacoPilotInstalled) {
     throw new Error(
       `Dependency install completed, but required binaries were not found. Missing: ${
         !astroInstalled ? "astro " : ""
-      }${!decapInstalled ? "decap-server " : ""}${!monacoInstalled ? "monaco-editor" : ""}`.trim()
+      }${!decapInstalled ? "decap-server " : ""}${!monacoInstalled ? "monaco-editor " : ""}${
+        !monacoPilotInstalled ? "monacopilot" : ""
+      }`.trim()
     );
   }
 
@@ -1032,10 +1652,25 @@ app.whenReady().then(async () => {
     setSplashStatus("Preparing dependencies...", "Validating Astro and Decap packages");
     await ensureWorkspaceDependencies();
     setSplashProgress(42);
+    setSplashStatus("Preparing editor engine...", "Resolving Monaco source");
+    const resolvedMonacoSource = getMonacoPackageSourceDir();
+    if (resolvedMonacoSource) {
+      appendStartupLog(`Monaco source selected: ${resolvedMonacoSource}`);
+    } else {
+      appendStartupLog("Monaco source unavailable before server start.");
+    }
+    setSplashProgress(48);
+    setSplashStatus("Preparing editor assets...", "Starting local Monaco asset server");
+    try {
+      await startMonacoAssetServer();
+    } catch (error) {
+      appendStartupLog(`Monaco asset server startup failed: ${error.message}`);
+    }
+    setSplashProgress(52);
 
     setSplashStatus("Starting services...", "Launching Astro + Decap CMS");
     const earlyExitPromise = startCmsServer();
-    setSplashProgress(55);
+    setSplashProgress(60);
     await waitForCmsServer(earlyExitPromise);
     setSplashStatus("Opening editor window...", "Almost ready");
     createMainWindow();
@@ -1056,11 +1691,13 @@ app.whenReady().then(async () => {
 
 app.on("window-all-closed", () => {
   stopCmsServer();
+  stopMonacoAssetServer();
   app.quit();
 });
 
 app.on("before-quit", () => {
   stopCmsServer();
+  stopMonacoAssetServer();
   if (startupLogStream) {
     startupLogStream.end();
     startupLogStream = null;

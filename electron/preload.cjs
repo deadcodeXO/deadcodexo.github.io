@@ -28,6 +28,10 @@ try {
       ipcRenderer.invoke("workspace-delete-file", relativePath),
     getWorkspaceMonacoBaseUrl: () =>
       ipcRenderer.invoke("workspace-monaco-base-url"),
+    getMonacoPilotConfig: () =>
+      ipcRenderer.invoke("workspace-monacopilot-config"),
+    requestMonacoPilotCompletion: payload =>
+      ipcRenderer.invoke("workspace-monacopilot-complete", payload),
     onRefreshCms: callback => {
       const listener = () => callback();
       ipcRenderer.on("refresh-cms", listener);

@@ -17,6 +17,7 @@
   const currentFileLabel = document.getElementById("current-file-label");
   const saveFileBtn = document.getElementById("save-file-btn");
   const saveAsFileBtn = document.getElementById("save-as-file-btn");
+  const aiCompleteBtn = document.getElementById("ai-complete-btn");
   const undoFileBtn = document.getElementById("undo-file-btn");
   const redoFileBtn = document.getElementById("redo-file-btn");
   const deleteFileBtn = document.getElementById("delete-file-btn");
@@ -25,7 +26,6 @@
   const fileFilterInput = document.getElementById("file-filter-input");
   const fileListEl = document.getElementById("file-list");
   const editorEmpty = document.getElementById("editor-empty");
-  const plainEditor = document.getElementById("plain-editor");
   const monacoHost = document.getElementById("monaco-host");
   const workspaceMain = document.getElementById("workspace-main");
   const workspaceResizer = document.getElementById("workspace-resizer");
@@ -89,8 +89,15 @@
   let monacoReadyPromise = null;
   let monacoInstance = null;
   let monacoEditor = null;
+  let monacoPilotRegistration = null;
+  let monacoPilotInitPromise = null;
+  let monacoPilotConfig = null;
+  let monacoPilotResolvedModel = "";
+  let monacoPilotLanguage = "";
+  let monacoPilotAutoTriggerTimer = null;
+  let monacoPilotRequestsInFlight = 0;
+  let openFileRequestId = 0;
   let activeEditorMode = "none";
-  let monacoFailureLogged = false;
   let editorVisible = true;
   let consoleVisible = true;
   let pendingConfirmResolve = null;
@@ -98,11 +105,8 @@
   let saveAsInProgress = false;
   let currentTheme = "dark";
   const expandedDirs = new Set([""]);
-  const loadedScriptUrls = new Set();
-  const plainUndoStack = [];
-  const plainRedoStack = [];
+  const loadedScriptPromises = new Map();
   const unknownWriteApprovalPaths = new Set();
-  let applyingPlainHistory = false;
   let applyingMonacoProgrammaticChange = false;
   const KNOWN_TEXT_EXTENSIONS = new Set([
     ".astro",
@@ -223,6 +227,63 @@
     if (editorStatus) editorStatus.textContent = text;
   };
 
+  const setMonacoPilotBusy = busy => {
+    if (!aiCompleteBtn) return;
+    aiCompleteBtn.classList.toggle("active", Boolean(busy));
+    aiCompleteBtn.classList.toggle("busy", Boolean(busy));
+    aiCompleteBtn.setAttribute(
+      "aria-label",
+      busy ? "AI completion request in progress" : "Trigger AI completion"
+    );
+  };
+
+  const clearMonacoPilotAutoTrigger = () => {
+    if (monacoPilotAutoTriggerTimer) {
+      window.clearTimeout(monacoPilotAutoTriggerTimer);
+      monacoPilotAutoTriggerTimer = null;
+    }
+  };
+
+  const triggerMonacoPilotCompletion = reason => {
+    if (!monacoPilotRegistration || activeEditorMode !== "monaco" || !monacoEditor) {
+      return false;
+    }
+
+    const model = monacoEditor.getModel?.();
+    const position = monacoEditor.getPosition?.();
+    if (!model || !position) return false;
+
+    const currentLine = model.getLineContent(position.lineNumber) || "";
+    const textBeforeCursor = currentLine.slice(0, Math.max(0, position.column - 1));
+    if (reason !== "manual" && !textBeforeCursor.trim()) {
+      return false;
+    }
+
+    try {
+      monacoPilotRegistration.trigger();
+      if (reason === "manual") {
+        setEditorStatus("AI completion requested...");
+        log("MonacoPilot manual trigger.");
+      }
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      log(`MonacoPilot trigger failed: ${message}`);
+      return false;
+    }
+  };
+
+  const scheduleMonacoPilotAutoTrigger = () => {
+    if (!monacoPilotRegistration || activeEditorMode !== "monaco" || !monacoEditor) {
+      return;
+    }
+    clearMonacoPilotAutoTrigger();
+    monacoPilotAutoTriggerTimer = window.setTimeout(() => {
+      monacoPilotAutoTriggerTimer = null;
+      triggerMonacoPilotCompletion("auto");
+    }, 650);
+  };
+
   const setEditorPaneVisible = visible => {
     editorVisible = Boolean(visible);
     workspaceMain?.classList.toggle("editor-hidden", !editorVisible);
@@ -267,10 +328,8 @@
     if (!saveFileBtn) return;
     const canEdit = Boolean(activeFilePath) && activeEditorMode !== "none";
     const isBusy = saveInProgress || saveAsInProgress;
-    const canUndoPlain = activeEditorMode === "plain" && plainUndoStack.length > 1;
-    const canRedoPlain = activeEditorMode === "plain" && plainRedoStack.length > 0;
-    const canUndo = activeEditorMode === "plain" ? canUndoPlain : canEdit;
-    const canRedo = activeEditorMode === "plain" ? canRedoPlain : canEdit;
+    const canUndo = activeEditorMode === "monaco" && Boolean(activeFilePath);
+    const canRedo = activeEditorMode === "monaco" && Boolean(activeFilePath);
     saveFileBtn.disabled = !canEdit || isBusy;
     saveFileBtn.style.opacity = saveFileBtn.disabled ? "0.5" : "1";
     saveFileBtn.style.cursor = saveFileBtn.disabled ? "default" : "pointer";
@@ -526,8 +585,8 @@
 
   const setEditorMode = mode => {
     activeEditorMode = mode;
-    if (plainEditor) {
-      plainEditor.classList.toggle("hidden", mode !== "plain");
+    if (mode !== "monaco") {
+      clearMonacoPilotAutoTrigger();
     }
     setMonacoVisibility(mode === "monaco");
     setEditorEmptyState(mode === "none");
@@ -544,10 +603,26 @@
     if (activeEditorMode === "monaco" && monacoEditor) {
       return monacoEditor.getValue();
     }
-    if (activeEditorMode === "plain" && plainEditor) {
-      return plainEditor.value;
-    }
     return "";
+  };
+
+  const closeMonacoTransientWidgets = () => {
+    if (!monacoEditor) return;
+    const closeActionIds = [
+      "closeFindWidget",
+      "closeQuickInput",
+      "closeReferenceSearch",
+    ];
+    closeActionIds.forEach(actionId => {
+      try {
+        const action = monacoEditor.getAction?.(actionId);
+        if (action?.run) {
+          Promise.resolve(action.run()).catch(() => {});
+        }
+      } catch {
+        // Ignore action availability/runtime differences across Monaco builds.
+      }
+    });
   };
 
   const showConfirmModal = ({
@@ -737,94 +812,102 @@
     if (resolver) resolver({ accepted: true, value: normalized });
   };
 
-  const pushPlainUndoState = () => {
-    if (!plainEditor || applyingPlainHistory) return;
-    const value = plainEditor.value;
-    if (plainUndoStack.length && plainUndoStack[plainUndoStack.length - 1] === value) return;
-    plainUndoStack.push(value);
-    if (plainUndoStack.length > 300) plainUndoStack.shift();
-  };
-
-  const resetPlainHistory = () => {
-    plainUndoStack.length = 0;
-    plainRedoStack.length = 0;
-    if (plainEditor) {
-      plainUndoStack.push(plainEditor.value);
-    }
-    updateSaveButtonState();
-  };
-
-  const applyPlainHistoryValue = value => {
-    if (!plainEditor) return;
-    applyingPlainHistory = true;
-    plainEditor.value = value;
-    applyingPlainHistory = false;
-    const nextDirty = isValueDirty(plainEditor.value, lastSavedContents);
-    if (nextDirty !== isDirty) {
-      isDirty = nextDirty;
-      updateCurrentFileLabel();
-      renderWorkspaceFiles();
-    }
-    updateSaveButtonState();
-    plainEditor.focus();
-  };
-
-  plainEditor?.addEventListener("input", () => {
-    if (activeEditorMode === "plain" && !applyingPlainHistory) {
-      pushPlainUndoState();
-      plainRedoStack.length = 0;
-    }
-    if (activeEditorMode !== "plain" || !activeFilePath) return;
-    const nextDirty = isValueDirty(plainEditor.value, lastSavedContents);
-    if (nextDirty !== isDirty) {
-      isDirty = nextDirty;
-      updateCurrentFileLabel();
-      renderWorkspaceFiles();
-    }
-    updateSaveButtonState();
-  });
-
   const loadExternalScript = src => {
-    if (loadedScriptUrls.has(src)) return Promise.resolve();
-    return new Promise((resolve, reject) => {
+    const existing = loadedScriptPromises.get(src);
+    if (existing) return existing;
+
+    const promise = new Promise((resolve, reject) => {
       const script = document.createElement("script");
       const timeout = window.setTimeout(() => {
+        loadedScriptPromises.delete(src);
         reject(new Error(`Timed out loading script: ${src}`));
-      }, 30000);
+      }, 20000);
       script.src = src;
       script.async = true;
       script.onload = () => {
         window.clearTimeout(timeout);
-        loadedScriptUrls.add(src);
         resolve();
       };
       script.onerror = () => {
         window.clearTimeout(timeout);
+        loadedScriptPromises.delete(src);
         reject(new Error(`Failed to load script: ${src}`));
       };
       document.head.appendChild(script);
     });
+
+    loadedScriptPromises.set(src, promise);
+    return promise;
   };
 
-  const loadMonacoFromBaseUrl = async baseUrl => {
-    await loadExternalScript(`${baseUrl}/loader.js`);
-    if (!window.require || typeof window.require.config !== "function") {
-      throw new Error("Monaco AMD loader did not initialize.");
+  const waitForAmdLoader = () => new Promise((resolve, reject) => {
+    const deadline = Date.now() + 2000;
+    const tick = () => {
+      if (window.require && typeof window.require.config === "function") {
+        resolve();
+        return;
+      }
+      if (Date.now() >= deadline) {
+        reject(new Error("Monaco AMD loader did not initialize."));
+        return;
+      }
+      window.setTimeout(tick, 25);
+    };
+    tick();
+  });
+
+  const ensureAmdLoader = async normalizedBase => {
+    if (window.require && typeof window.require.config === "function") {
+      return;
     }
+    await loadExternalScript(`${normalizedBase}/loader.js`);
+    await waitForAmdLoader();
+  };
+
+  const loadMonacoFromAmdBaseUrl = async baseUrl => {
+    if (!baseUrl) throw new Error("Missing Monaco AMD base URL.");
+
+    const normalizedBase = String(baseUrl).replace(/\/+$/, "");
+    await ensureAmdLoader(normalizedBase);
 
     window.require.config({
-      paths: {
-        vs: baseUrl,
+      paths: { vs: normalizedBase },
+      waitSeconds: 30,
+      "vs/nls": {
+        availableLanguages: {
+          "*": "en",
+        },
       },
     });
+    try {
+      window.require.undef?.("vs/editor/editor.main");
+    } catch {
+      // Ignore undef support differences.
+    }
 
     await new Promise((resolve, reject) => {
       let settled = false;
+      const previousOnError = window.require.onError;
       const timeout = window.setTimeout(() => {
         if (settled) return;
         settled = true;
+        window.require.onError = previousOnError;
         reject(new Error("Timed out loading Monaco editor modules."));
-      }, 30000);
+      }, 40000);
+
+      window.require.onError = error => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeout);
+        window.require.onError = previousOnError;
+        reject(
+          new Error(
+            `Monaco AMD error: ${error?.requireType || "unknown"} ${String(
+              error?.requireModules || ""
+            )}`.trim()
+          )
+        );
+      };
 
       window.require(
         ["vs/editor/editor.main"],
@@ -832,12 +915,14 @@
           if (settled) return;
           settled = true;
           window.clearTimeout(timeout);
+          window.require.onError = previousOnError;
           resolve();
         },
         error => {
           if (settled) return;
           settled = true;
           window.clearTimeout(timeout);
+          window.require.onError = previousOnError;
           reject(error instanceof Error ? error : new Error(String(error)));
         }
       );
@@ -894,6 +979,222 @@
     }
   };
 
+  const buildLmStudioPrompt = completionMetadata => {
+    const stack = [completionMetadata?.language, ...(completionMetadata?.technologies || [])]
+      .filter(Boolean)
+      .join(", ");
+    const relatedFiles = Array.isArray(completionMetadata?.relatedFiles)
+      ? completionMetadata.relatedFiles
+      : [];
+    const relatedContext = relatedFiles
+      .slice(0, 4)
+      .map(file => `### ${file.path}\n${file.content || ""}`)
+      .join("\n\n");
+
+    return [
+      stack ? `Tech stack: ${stack}` : "",
+      completionMetadata?.filename ? `File: ${completionMetadata.filename}` : "",
+      relatedContext ? `Related files:\n${relatedContext}` : "",
+      "Current code:",
+      "```",
+      `${completionMetadata?.textBeforeCursor || ""}<|cursor|>${completionMetadata?.textAfterCursor || ""}`,
+      "```",
+      "",
+      "Return only the completion text to insert at the cursor.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  };
+
+  const requestWithTimeout = async (url, options = {}, timeoutMs = 15000) => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+    } finally {
+      window.clearTimeout(timer);
+    }
+  };
+
+  const resolveLmStudioModel = async lmstudio => {
+    if (monacoPilotResolvedModel) return monacoPilotResolvedModel;
+    if (lmstudio?.model) {
+      monacoPilotResolvedModel = lmstudio.model;
+      return monacoPilotResolvedModel;
+    }
+
+    const base = String(lmstudio?.baseUrl || "http://127.0.0.1:1234/v1").replace(/\/+$/, "");
+    const modelsUrl = `${base}/models`;
+    try {
+      const response = await requestWithTimeout(modelsUrl, { method: "GET" }, 5000);
+      if (!response.ok) throw new Error(`models endpoint returned ${response.status}`);
+      const payload = await response.json();
+      const firstModel = Array.isArray(payload?.data) ? payload.data[0]?.id : "";
+      monacoPilotResolvedModel = firstModel || "local-model";
+    } catch {
+      monacoPilotResolvedModel = "local-model";
+    }
+    return monacoPilotResolvedModel;
+  };
+
+  const requestLmStudioCompletion = async ({ body }, lmstudio) => {
+    if (typeof api?.requestMonacoPilotCompletion === "function") {
+      const result = await api.requestMonacoPilotCompletion({
+        body,
+        lmstudio,
+      });
+      if (result && typeof result === "object") {
+        return result;
+      }
+      return { completion: null, error: "MonacoPilot IPC completion returned no response." };
+    }
+
+    const metadata = body?.completionMetadata;
+    const prompt = buildLmStudioPrompt(metadata);
+    const model = await resolveLmStudioModel(lmstudio);
+    const base = String(lmstudio?.baseUrl || "http://127.0.0.1:1234/v1").replace(/\/+$/, "");
+    const endpoint = `${base}/chat/completions`;
+    const headers = {
+      "Content-Type": "application/json",
+    };
+    if (lmstudio?.apiKey) {
+      headers.Authorization = `Bearer ${lmstudio.apiKey}`;
+    }
+
+    const response = await requestWithTimeout(
+      endpoint,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model,
+          temperature: lmstudio?.temperature ?? 0.2,
+          max_tokens: lmstudio?.maxTokens ?? 192,
+          stream: false,
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are a code completion engine. Return only code to insert at the cursor. No markdown.",
+            },
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+        }),
+      },
+      15000
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      return { completion: null, error: `LM Studio error ${response.status}: ${text}` };
+    }
+
+    const payload = await response.json();
+    const completion =
+      payload?.choices?.[0]?.message?.content ??
+      payload?.choices?.[0]?.text ??
+      null;
+
+    return {
+      completion: typeof completion === "string" ? completion : null,
+    };
+  };
+
+  const getMonacoPilotConfigOnce = async () => {
+    if (monacoPilotConfig) return monacoPilotConfig;
+    try {
+      monacoPilotConfig = await api?.getMonacoPilotConfig?.();
+    } catch {
+      monacoPilotConfig = null;
+    }
+    return monacoPilotConfig;
+  };
+
+  const ensureMonacoPilotRegistration = async language => {
+    if (!monacoInstance?.languages || !monacoEditor) return;
+    if (monacoPilotRegistration && monacoPilotLanguage === language) {
+      return;
+    }
+    if (monacoPilotRegistration && monacoPilotLanguage !== language) {
+      monacoPilotRegistration.deregister?.();
+      monacoPilotRegistration = null;
+      monacoPilotInitPromise = null;
+      monacoPilotLanguage = "";
+      monacoPilotRequestsInFlight = 0;
+      setMonacoPilotBusy(false);
+      clearMonacoPilotAutoTrigger();
+    }
+
+    if (!monacoPilotInitPromise) {
+      monacoPilotInitPromise = (async () => {
+        const config = await getMonacoPilotConfigOnce();
+        if (!config?.enabled) return;
+        if (!config?.scriptUrl) {
+          log("MonacoPilot unavailable: script URL missing.");
+          return;
+        }
+
+        await loadExternalScript(config.scriptUrl);
+        const monacoPilot = window.monacopilot;
+        if (!monacoPilot?.registerCompletion) {
+          throw new Error("MonacoPilot loaded but registerCompletion is unavailable.");
+        }
+
+        monacoPilotRegistration = monacoPilot.registerCompletion(monacoInstance, monacoEditor, {
+          language,
+          trigger: "onDemand",
+          enableCaching: true,
+          requestHandler: params => requestLmStudioCompletion(params, config.lmstudio),
+          onCompletionRequested: () => {
+            monacoPilotRequestsInFlight += 1;
+            setMonacoPilotBusy(true);
+            log(`MonacoPilot request (${language})`);
+          },
+          onCompletionShown: () => {
+            setEditorStatus("AI suggestion ready. Press Tab to accept.");
+          },
+          onCompletionAccepted: () => {
+            setEditorStatus("AI suggestion accepted");
+          },
+          onCompletionRejected: () => {
+            setEditorStatus("AI suggestion dismissed");
+          },
+          onCompletionRequestFinished: (_params, response) => {
+            monacoPilotRequestsInFlight = Math.max(0, monacoPilotRequestsInFlight - 1);
+            setMonacoPilotBusy(monacoPilotRequestsInFlight > 0);
+            if (response?.completion) {
+              log(`MonacoPilot completion (${language})`);
+            } else {
+              setEditorStatus("No AI completion for current context.");
+            }
+          },
+          onError: error => {
+            monacoPilotRequestsInFlight = Math.max(0, monacoPilotRequestsInFlight - 1);
+            setMonacoPilotBusy(monacoPilotRequestsInFlight > 0);
+            const message = error instanceof Error ? error.message : String(error);
+            log(`MonacoPilot error: ${message}`);
+            setEditorStatus(`AI completion error: ${message}`);
+          },
+        });
+        monacoPilotLanguage = language;
+
+        const base = config?.lmstudio?.baseUrl || "http://127.0.0.1:1234/v1";
+        log(`MonacoPilot enabled (LM Studio: ${base}).`);
+      })().catch(error => {
+        const message = error instanceof Error ? error.message : String(error);
+        log(`MonacoPilot init failed: ${message}`);
+      });
+    }
+
+    await monacoPilotInitPromise;
+  };
+
   const ensureMonacoEditor = async () => {
     if (monacoEditor) return monacoEditor;
 
@@ -904,15 +1205,28 @@
     if (!monacoReadyPromise) {
       monacoReadyPromise = (async () => {
         let preferredBase = "";
+        let preferredBases = [];
         try {
           const response = await api?.getWorkspaceMonacoBaseUrl?.();
-          preferredBase = response?.baseUrl || "";
+          preferredBase = response?.baseUrl || response?.esmBaseUrl || "";
+          if (Array.isArray(response?.baseUrls)) {
+            preferredBases = response.baseUrls.filter(
+              value => typeof value === "string" && value.trim()
+            );
+          } else if (Array.isArray(response?.esmBaseUrls)) {
+            preferredBases = response.esmBaseUrls.filter(
+              value => typeof value === "string" && value.trim()
+            );
+          }
         } catch {
           preferredBase = "";
+          preferredBases = [];
         }
 
-        const baseCandidates = [];
-        if (preferredBase) baseCandidates.push(preferredBase);
+        const baseCandidates = [...preferredBases];
+        if (preferredBase && !baseCandidates.includes(preferredBase)) {
+          baseCandidates.push(preferredBase);
+        }
         const cdnBase = "https://cdn.jsdelivr.net/npm/monaco-editor@0.53.0/min/vs";
         if (!baseCandidates.includes(cdnBase)) {
           baseCandidates.push(cdnBase);
@@ -920,12 +1234,34 @@
 
         let lastError = null;
         for (const candidate of baseCandidates) {
-          try {
-            monacoInstance = await loadMonacoFromBaseUrl(candidate);
-            log(`Monaco loaded from ${candidate}`);
+          const maxAttempts =
+            typeof candidate === "string" && candidate.startsWith("http://127.0.0.1")
+              ? 2
+              : 1;
+          for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+            try {
+              monacoInstance = await loadMonacoFromAmdBaseUrl(candidate);
+              if (attempt > 1) {
+                log(`Monaco loaded from ${candidate} (retry ${attempt})`);
+              } else {
+                log(`Monaco loaded from ${candidate}`);
+              }
+              break;
+            } catch (error) {
+              lastError = error;
+              const detail = error instanceof Error ? error.message : String(error);
+              log(
+                `Monaco source failed (${candidate})${
+                  maxAttempts > 1 ? ` [attempt ${attempt}/${maxAttempts}]` : ""
+                }: ${detail}`
+              );
+              if (attempt < maxAttempts) {
+                await new Promise(resolve => window.setTimeout(resolve, 200));
+              }
+            }
+          }
+          if (monacoInstance?.editor) {
             break;
-          } catch (error) {
-            lastError = error;
           }
         }
 
@@ -955,7 +1291,18 @@
         value: "",
         language: "plaintext",
         automaticLayout: true,
+        inlineSuggest: {
+          enabled: true,
+          suppressSuggestions: true,
+        },
+        quickSuggestions: {
+          other: false,
+          comments: false,
+          strings: false,
+        },
+        suggestOnTriggerCharacters: false,
         minimap: { enabled: false },
+        accessibilitySupport: "off",
         fontSize: 13,
         lineNumbersMinChars: 3,
         smoothScrolling: true,
@@ -966,6 +1313,7 @@
       monacoEditor.onDidChangeModelContent(() => {
         if (applyingMonacoProgrammaticChange) return;
         if (!activeFilePath) return;
+        scheduleMonacoPilotAutoTrigger();
         const nextDirty = isValueDirty(monacoEditor.getValue(), lastSavedContents);
         if (nextDirty === isDirty) return;
         isDirty = nextDirty;
@@ -976,7 +1324,6 @@
 
       applyMonacoTheme(currentTheme);
       setMonacoVisibility(activeEditorMode === "monaco");
-      monacoFailureLogged = false;
     }
 
     return monacoEditor;
@@ -1148,8 +1495,6 @@
         isDirty = false;
         updateCurrentFileLabel();
         updateSaveButtonState();
-        if (plainEditor) plainEditor.value = "";
-        resetPlainHistory();
         setEditorMode("none");
       }
     } catch (error) {
@@ -1160,7 +1505,7 @@
 
   const openWorkspaceFile = async relativePath => {
     if (!relativePath || !api?.readWorkspaceFile) return;
-    if (activeFilePath && activeFilePath !== relativePath) {
+    if (activeEditorMode === "monaco" && activeFilePath && activeFilePath !== relativePath) {
       const currentDirty = isValueDirty(getCurrentEditorValue(), lastSavedContents);
       if (currentDirty !== isDirty) {
         isDirty = currentDirty;
@@ -1179,9 +1524,11 @@
       }
     }
 
+    const requestId = ++openFileRequestId;
     setEditorStatus(`Opening ${relativePath}...`);
     try {
       const payload = await api.readWorkspaceFile(relativePath);
+      if (requestId !== openFileRequestId) return;
       if (payload?.missing) {
         throw new Error(`File not found: ${relativePath}`);
       }
@@ -1189,12 +1536,24 @@
       const contents = payload?.contents || "";
       const language = getLanguageForPath(filePath);
 
-      // Show content immediately in the lightweight fallback so first open never stalls.
-      if (plainEditor) {
-        plainEditor.value = contents;
-        resetPlainHistory();
-        setEditorMode("plain");
+      if (!monacoEditor) {
+        setEditorMode("none");
+        setEditorStatus("Loading Monaco editor...");
       }
+      const editor = await ensureMonacoEditor();
+      if (requestId !== openFileRequestId) return;
+
+      try {
+        applyingMonacoProgrammaticChange = true;
+        editor.setValue(contents);
+        const model = editor.getModel();
+        if (model && monacoInstance?.editor?.setModelLanguage) {
+          monacoInstance.editor.setModelLanguage(model, language);
+        }
+      } finally {
+        applyingMonacoProgrammaticChange = false;
+      }
+      await ensureMonacoPilotRegistration(language);
 
       activeFilePath = filePath;
       lastSavedContents = contents;
@@ -1203,43 +1562,13 @@
       updateCurrentFileLabel();
       updateSaveButtonState();
       renderWorkspaceFiles();
+      setEditorMode("monaco");
+      closeMonacoTransientWidgets();
+      editor.focus();
       setEditorStatus(`${filePath} loaded`);
       window.localStorage.setItem(LAST_OPEN_FILE_KEY, filePath);
-
-      ensureMonacoEditor()
-        .then(editor => {
-          if (activeFilePath !== filePath) return;
-          try {
-            applyingMonacoProgrammaticChange = true;
-            editor.setValue(contents);
-            const model = editor.getModel();
-            if (model && monacoInstance?.editor?.setModelLanguage) {
-              monacoInstance.editor.setModelLanguage(model, language);
-            }
-          } finally {
-            applyingMonacoProgrammaticChange = false;
-          }
-          isDirty = false;
-          updateCurrentFileLabel();
-          updateSaveButtonState();
-          renderWorkspaceFiles();
-          setEditorMode("monaco");
-          editor.focus();
-          monacoFailureLogged = false;
-        })
-        .catch(monacoError => {
-          applyingMonacoProgrammaticChange = false;
-          if (!monacoFailureLogged) {
-            monacoFailureLogged = true;
-            log(`Monaco load warning: ${monacoError.message}`);
-            log("Using basic editor mode for now.");
-          }
-          if (activeFilePath === filePath) {
-            setEditorMode("plain");
-            setEditorStatus(`${filePath} loaded (basic editor mode)`);
-          }
-        });
     } catch (error) {
+      if (requestId !== openFileRequestId) return;
       setEditorStatus("Failed to open file");
       log(`Open file failed: ${error.message}`);
     }
@@ -1386,19 +1715,6 @@
   const runUndo = () => {
     if (activeEditorMode === "monaco" && monacoEditor) {
       monacoEditor.trigger("keyboard", "undo", null);
-      return;
-    }
-    if (activeEditorMode === "plain" && plainEditor) {
-      if (plainUndoStack.length <= 1) {
-        setEditorStatus("Nothing to undo");
-        return;
-      }
-      const current = plainUndoStack.pop();
-      if (typeof current === "string") {
-        plainRedoStack.push(current);
-      }
-      const previous = plainUndoStack[plainUndoStack.length - 1] || "";
-      applyPlainHistoryValue(previous);
       setEditorStatus("Undo applied");
     }
   };
@@ -1406,17 +1722,6 @@
   const runRedo = () => {
     if (activeEditorMode === "monaco" && monacoEditor) {
       monacoEditor.trigger("keyboard", "redo", null);
-      return;
-    }
-    if (activeEditorMode === "plain" && plainEditor) {
-      if (!plainRedoStack.length) {
-        setEditorStatus("Nothing to redo");
-        return;
-      }
-      const nextValue = plainRedoStack.pop();
-      if (typeof nextValue !== "string") return;
-      plainUndoStack.push(nextValue);
-      applyPlainHistoryValue(nextValue);
       setEditorStatus("Redo applied");
     }
   };
@@ -1446,10 +1751,6 @@
 
     try {
       await api.deleteWorkspaceFile(deletingPath);
-      if (activeEditorMode === "plain" && plainEditor) {
-        plainEditor.value = "";
-        resetPlainHistory();
-      }
       if (activeEditorMode === "monaco" && monacoEditor) {
         monacoEditor.setValue("");
       }
@@ -1513,6 +1814,12 @@
 
   redoFileBtn?.addEventListener("click", () => {
     runRedo();
+  });
+
+  aiCompleteBtn?.addEventListener("click", () => {
+    if (!triggerMonacoPilotCompletion("manual")) {
+      log("MonacoPilot is not ready yet for manual trigger.");
+    }
   });
 
   deleteFileBtn?.addEventListener("click", () => {
@@ -1633,6 +1940,14 @@
       reloadFrame();
     }
 
+    if (key === "f") {
+      event.preventDefault();
+      fileFilterInput?.focus();
+      fileFilterInput?.select();
+      closeMonacoTransientWidgets();
+      return;
+    }
+
     if (key === "l" && event.shiftKey) {
       event.preventDefault();
       setConsolePaneVisible(!consoleVisible);
@@ -1646,6 +1961,14 @@
     if (key === "s" && !event.shiftKey) {
       event.preventDefault();
       saveCurrentFile();
+    }
+
+    if (event.altKey && key === "\\") {
+      event.preventDefault();
+      if (!triggerMonacoPilotCompletion("manual")) {
+        log("MonacoPilot is not ready yet for manual trigger.");
+      }
+      return;
     }
 
     if (key === "n" && event.shiftKey) {
@@ -1734,7 +2057,6 @@
   setEditorPaneVisible(window.localStorage.getItem(EDITOR_VISIBLE_KEY) !== "0");
   setConsolePaneVisible(window.localStorage.getItem(CONSOLE_VISIBLE_KEY) !== "0");
   refreshWorkspaceFiles();
-  ensureMonacoEditor().catch(() => {});
 
   const workspaceResizeObserver = new ResizeObserver(() => {
     if (monacoEditor) monacoEditor.layout();
@@ -1750,9 +2072,15 @@
 
   window.addEventListener("beforeunload", () => {
     window.clearInterval(themeSyncTimer);
+    clearMonacoPilotAutoTrigger();
     if (frameThemeObserver) frameThemeObserver.disconnect();
     if (frameUiObserver) frameUiObserver.disconnect();
     workspaceResizeObserver.disconnect();
+    if (monacoPilotRegistration?.deregister) {
+      monacoPilotRegistration.deregister();
+      monacoPilotRegistration = null;
+    }
+    setMonacoPilotBusy(false);
   });
 
   setEditorStatus("Editor ready");

@@ -3,7 +3,11 @@
 
 # build output
 dist/
+release-*/
 release/
+
+# editor
+standalone-editor/
 
 # generated types
 .astro/

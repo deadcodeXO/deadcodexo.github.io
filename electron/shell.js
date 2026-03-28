@@ -62,6 +62,7 @@
   const LAST_OPEN_FILE_KEY = "dcx-last-open-file";
   const EDITOR_VISIBLE_KEY = "dcx-editor-visible";
   const CONSOLE_VISIBLE_KEY = "dcx-console-visible";
+  const MONACOPILOT_ENABLED_KEY = "dcx-monacopilot-enabled";
   const FRAME_HIDE_STYLE_ID = "dcx-hide-astro-dev-toolbar";
   const FRAME_HIDE_CSS = `
     astro-dev-toolbar,
@@ -94,6 +95,9 @@
   let monacoPilotConfig = null;
   let monacoPilotResolvedModel = "";
   let monacoPilotLanguage = "";
+  let monacoPilotEnabledLogged = false;
+  let monacoPilotSystemEnabled = true;
+  let monacoPilotUserEnabled = true;
   let monacoPilotAutoTriggerTimer = null;
   let monacoPilotRequestsInFlight = 0;
   let openFileRequestId = 0;
@@ -227,14 +231,52 @@
     if (editorStatus) editorStatus.textContent = text;
   };
 
-  const setMonacoPilotBusy = busy => {
+  const isMonacoPilotEnabled = () => monacoPilotSystemEnabled && monacoPilotUserEnabled;
+
+  const setMonacoPilotToggleUi = () => {
     if (!aiCompleteBtn) return;
-    aiCompleteBtn.classList.toggle("active", Boolean(busy));
-    aiCompleteBtn.classList.toggle("busy", Boolean(busy));
+    const enabled = isMonacoPilotEnabled();
+    aiCompleteBtn.classList.toggle("active", enabled);
+
+    if (!monacoPilotSystemEnabled) {
+      aiCompleteBtn.disabled = true;
+      aiCompleteBtn.style.opacity = "0.5";
+      aiCompleteBtn.style.cursor = "default";
+      aiCompleteBtn.title = "AI completions unavailable";
+      aiCompleteBtn.setAttribute("aria-label", "AI completions unavailable");
+      return;
+    }
+
+    aiCompleteBtn.disabled = false;
+    aiCompleteBtn.style.opacity = "1";
+    aiCompleteBtn.style.cursor = "pointer";
+    aiCompleteBtn.title = enabled ? "Disable AI completions" : "Enable AI completions";
     aiCompleteBtn.setAttribute(
       "aria-label",
-      busy ? "AI completion request in progress" : "Trigger AI completion"
+      enabled ? "Disable AI completions" : "Enable AI completions"
     );
+  };
+
+  const setMonacoPilotBusy = busy => {
+    if (!aiCompleteBtn) return;
+    aiCompleteBtn.classList.toggle("busy", Boolean(busy));
+    if (busy) {
+      aiCompleteBtn.setAttribute("aria-label", "AI completion request in progress");
+    } else {
+      setMonacoPilotToggleUi();
+    }
+  };
+
+  const disableMonacoPilotRuntime = () => {
+    clearMonacoPilotAutoTrigger();
+    if (monacoPilotRegistration?.deregister) {
+      monacoPilotRegistration.deregister();
+    }
+    monacoPilotRegistration = null;
+    monacoPilotInitPromise = null;
+    monacoPilotLanguage = "";
+    monacoPilotRequestsInFlight = 0;
+    setMonacoPilotBusy(false);
   };
 
   const clearMonacoPilotAutoTrigger = () => {
@@ -245,6 +287,9 @@
   };
 
   const triggerMonacoPilotCompletion = reason => {
+    if (!isMonacoPilotEnabled()) {
+      return false;
+    }
     if (!monacoPilotRegistration || activeEditorMode !== "monaco" || !monacoEditor) {
       return false;
     }
@@ -274,6 +319,9 @@
   };
 
   const scheduleMonacoPilotAutoTrigger = () => {
+    if (!isMonacoPilotEnabled()) {
+      return;
+    }
     if (!monacoPilotRegistration || activeEditorMode !== "monaco" || !monacoEditor) {
       return;
     }
@@ -282,6 +330,33 @@
       monacoPilotAutoTriggerTimer = null;
       triggerMonacoPilotCompletion("auto");
     }, 650);
+  };
+
+  const toggleMonacoPilotEnabled = async () => {
+    const config = await getMonacoPilotConfigOnce();
+    monacoPilotSystemEnabled = Boolean(config?.enabled);
+    if (!monacoPilotSystemEnabled) {
+      setMonacoPilotToggleUi();
+      setEditorStatus("AI completions unavailable in this app configuration.");
+      return;
+    }
+
+    monacoPilotUserEnabled = !monacoPilotUserEnabled;
+    window.localStorage.setItem(MONACOPILOT_ENABLED_KEY, monacoPilotUserEnabled ? "1" : "0");
+    setMonacoPilotToggleUi();
+
+    if (!monacoPilotUserEnabled) {
+      disableMonacoPilotRuntime();
+      setEditorStatus("AI completions disabled");
+      log("MonacoPilot disabled.");
+      return;
+    }
+
+    setEditorStatus("AI completions enabled");
+    log("MonacoPilot enabled.");
+    if (activeEditorMode === "monaco" && activeFilePath) {
+      await ensureMonacoPilotRegistration(getLanguageForPath(activeFilePath));
+    }
   };
 
   const setEditorPaneVisible = visible => {
@@ -1113,28 +1188,30 @@
     } catch {
       monacoPilotConfig = null;
     }
+    monacoPilotSystemEnabled = Boolean(monacoPilotConfig?.enabled);
+    if (!monacoPilotSystemEnabled) {
+      disableMonacoPilotRuntime();
+    }
+    setMonacoPilotToggleUi();
     return monacoPilotConfig;
   };
 
   const ensureMonacoPilotRegistration = async language => {
     if (!monacoInstance?.languages || !monacoEditor) return;
+    const config = await getMonacoPilotConfigOnce();
+    if (!config?.enabled || !monacoPilotUserEnabled) {
+      disableMonacoPilotRuntime();
+      return;
+    }
     if (monacoPilotRegistration && monacoPilotLanguage === language) {
       return;
     }
     if (monacoPilotRegistration && monacoPilotLanguage !== language) {
-      monacoPilotRegistration.deregister?.();
-      monacoPilotRegistration = null;
-      monacoPilotInitPromise = null;
-      monacoPilotLanguage = "";
-      monacoPilotRequestsInFlight = 0;
-      setMonacoPilotBusy(false);
-      clearMonacoPilotAutoTrigger();
+      disableMonacoPilotRuntime();
     }
 
     if (!monacoPilotInitPromise) {
       monacoPilotInitPromise = (async () => {
-        const config = await getMonacoPilotConfigOnce();
-        if (!config?.enabled) return;
         if (!config?.scriptUrl) {
           log("MonacoPilot unavailable: script URL missing.");
           return;
@@ -1154,7 +1231,6 @@
           onCompletionRequested: () => {
             monacoPilotRequestsInFlight += 1;
             setMonacoPilotBusy(true);
-            log(`MonacoPilot request (${language})`);
           },
           onCompletionShown: () => {
             setEditorStatus("AI suggestion ready. Press Tab to accept.");
@@ -1168,9 +1244,7 @@
           onCompletionRequestFinished: (_params, response) => {
             monacoPilotRequestsInFlight = Math.max(0, monacoPilotRequestsInFlight - 1);
             setMonacoPilotBusy(monacoPilotRequestsInFlight > 0);
-            if (response?.completion) {
-              log(`MonacoPilot completion (${language})`);
-            } else {
+            if (!response?.completion) {
               setEditorStatus("No AI completion for current context.");
             }
           },
@@ -1184,8 +1258,11 @@
         });
         monacoPilotLanguage = language;
 
-        const base = config?.lmstudio?.baseUrl || "http://127.0.0.1:1234/v1";
-        log(`MonacoPilot enabled (LM Studio: ${base}).`);
+        if (!monacoPilotEnabledLogged) {
+          const base = config?.lmstudio?.baseUrl || "http://127.0.0.1:1234/v1";
+          log(`MonacoPilot enabled (LM Studio: ${base}).`);
+          monacoPilotEnabledLogged = true;
+        }
       })().catch(error => {
         const message = error instanceof Error ? error.message : String(error);
         log(`MonacoPilot init failed: ${message}`);
@@ -1817,9 +1894,9 @@
   });
 
   aiCompleteBtn?.addEventListener("click", () => {
-    if (!triggerMonacoPilotCompletion("manual")) {
-      log("MonacoPilot is not ready yet for manual trigger.");
-    }
+    toggleMonacoPilotEnabled().catch(error => {
+      log(`MonacoPilot toggle failed: ${error?.message || String(error)}`);
+    });
   });
 
   deleteFileBtn?.addEventListener("click", () => {
@@ -1965,6 +2042,10 @@
 
     if (event.altKey && key === "\\") {
       event.preventDefault();
+      if (!isMonacoPilotEnabled()) {
+        setEditorStatus("AI completions are disabled.");
+        return;
+      }
       if (!triggerMonacoPilotCompletion("manual")) {
         log("MonacoPilot is not ready yet for manual trigger.");
       }
@@ -2051,6 +2132,8 @@
       : "dark";
   applyShellTheme(preferredTheme);
   requestThemeFromEditor();
+  monacoPilotUserEnabled = window.localStorage.getItem(MONACOPILOT_ENABLED_KEY) !== "0";
+  setMonacoPilotToggleUi();
   updateCurrentFileLabel();
   updateSaveButtonState();
   initSplitter();
@@ -2072,15 +2155,10 @@
 
   window.addEventListener("beforeunload", () => {
     window.clearInterval(themeSyncTimer);
-    clearMonacoPilotAutoTrigger();
+    disableMonacoPilotRuntime();
     if (frameThemeObserver) frameThemeObserver.disconnect();
     if (frameUiObserver) frameUiObserver.disconnect();
     workspaceResizeObserver.disconnect();
-    if (monacoPilotRegistration?.deregister) {
-      monacoPilotRegistration.deregister();
-      monacoPilotRegistration = null;
-    }
-    setMonacoPilotBusy(false);
   });
 
   setEditorStatus("Editor ready");
